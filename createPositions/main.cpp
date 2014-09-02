@@ -2,14 +2,57 @@
 #include <cv.h>
 #include <highgui.h>
 #include <iostream>
+#include <netcdfcpp.h>
 
 using namespace cv;
 using namespace std;
 
+int setUpNetCDF(NcFile* dataFile, int nFrames, int nFish);
 
 int main( int argc, char** argv )
 {
     string dataDir = "/home/ctorney/data/fishPredation/";
+    string trialName = "MVI_3371";
+    int nFrames = 100;
+    int nFish = 4;
+
+    string ncFileName = dataDir + "tracked/" + trialName + ".nc";
+    NcFile dataFile(ncFileName.c_str(), NcFile::Replace);
+
+    if (!dataFile.is_valid())
+    {
+        cout << "Couldn't open netcdf file!\n";
+        return -1;
+    }
+
+    setUpNetCDF(&dataFile, nFrames, nFish );
+    NcVar* pxy = dataFile.get_var("pxy");
+
+    // This is the data array we will write. It will just be filled
+    // with a progression of numbers for this example.
+    float dataOut[nFish][2];
+
+    for (int t=0;t<20;t++)
+    {
+    // Create some pretend data. If this wasn't an example program, we
+    // would have some real data to write, for example, model output.
+    for(int i = 0; i < nFish; i++)
+    {
+            dataOut[i][0] = i + 0.1;
+            dataOut[i][1] = t + 0.125;
+    }
+
+    // Write the pretend data to the file. Although netCDF supports
+    // reading and writing subsets of data, in this case we write all
+    // the data in one operation.
+    pxy->set_cur(t);
+    pxy->put(&dataOut[0][0], 1, nFish, 2);
+    }
+    // The file will be automatically close when the NcFile object goes
+    // out of scope. This frees up any internal netCDF resources
+    // associated with the file, and flushes any buffers.
+
+
 
     string bkup = dataDir + "bk-up.png";
     string bkdown = dataDir + "bk-down.png";
@@ -50,8 +93,7 @@ int main( int argc, char** argv )
     blob_detector->create("SimpleBlob");
 
     vector<KeyPoint> keypoints;
-    
-    string movie = dataDir + "sampleVideo/MVI_3371.avi";
+    string movie = dataDir + "sampleVideo/" + trialName + ".avi";
     VideoCapture cap(movie);
     if (!cap.isOpened())
     {
@@ -94,3 +136,36 @@ int main( int argc, char** argv )
 
     return 0;
 }
+
+int setUpNetCDF(NcFile* dataFile, int nFrames, int nFish)
+{
+ //   dataFile->set_fill(NcFile::NoFill);
+//    return 0;
+    // dimension for each frame
+    NcDim* frDim = dataFile->add_dim("frame", nFrames);
+    // dimension for individual fish
+    NcDim* iDim = dataFile->add_dim("fish", nFish);
+    // xy dimension for vectors
+    NcDim* xyDim = dataFile->add_dim("xy", 2);
+    // dimension for tracks (unlimited as new tracks are created when a fish is lost)
+    NcDim* trDim = dataFile->add_dim("track");
+
+    // define a netCDF variable for the positions of individuals
+    dataFile->add_var("pxy", ncFloat, frDim, iDim, xyDim);
+    // define a netCDF variable for the positions of linked tracks
+    dataFile->add_var("trxy", ncFloat, trDim, frDim, xyDim);
+    // linked tracks following smoothing
+    dataFile->add_var("trxy_sm", ncFloat, trDim, frDim, xyDim);
+    // velocities
+    dataFile->add_var("tr_vel", ncFloat, trDim, frDim, xyDim);
+    // accelerations 
+    dataFile->add_var("tr_accel", ncFloat, trDim, frDim, xyDim);
+    // variable for ID of fish
+    dataFile->add_var("fid", ncShort, trDim, frDim);
+
+    return 0;
+
+}
+
+
+
