@@ -7,10 +7,21 @@ from SimpleCV import SVMClassifier, TreeClassifier
 import sys
 import random
 
+def myBinaryFunc(input):
+    return input.binarize().invert()
+
 
 from circularHOGExtractor import circularHOGExtractor
+from SimpleCV import MorphologyFeatureExtractor, HueHistogramFeatureExtractor
 
-ch = circularHOGExtractor(5,5,4) 
+ch = circularHOGExtractor(5,5,6) 
+mf = MorphologyFeatureExtractor (thresholdOperation = myBinaryFunc)
+hhf = HueHistogramFeatureExtractor ()
+#mf.setThresholdOperation(myBinaryFunc)
+#bt1 = Image("MVI_33711/img-1.png")
+
+#mf.extract(bt1)
+
 extractor = [ch] # put these all together
 svm = SVMClassifier(extractor) # try an svm, default is an RBF kernel function
 tree = TreeClassifier(extractor,flavor='Boosted') # also try a decision tree
@@ -21,9 +32,9 @@ trainPaths = ['./MVI_33710/','./MVI_33711/','./MVI_33712/','./MVI_33713/']
 classes = ['0','1','2','3']
 # # # train the data
 print svm.train(trainPaths,classes,verbose=True)
-print tree.train(trainPaths,classes,verbose=True)
+#print tree.train(trainPaths,classes,verbose=True)
 svm.save('trainedSVM.xml')
-tree.save('trainedTREE.xml')
+#tree.save('trainedTREE.xml')
 #
 #    outTest = False
 #

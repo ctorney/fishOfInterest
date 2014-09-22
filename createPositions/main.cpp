@@ -11,71 +11,9 @@ int setUpNetCDF(NcFile* dataFile, int nFrames, int nFish);
 
 int main( int argc, char** argv )
 {
-    string dataDir = "/home/ctorney/data/fishPredation/";
-    string trialName = "MVI_3371";
-    int nFrames = 100;
-    int nFish = 4;
-
-    string ncFileName = dataDir + "tracked/" + trialName + ".nc";
-    NcFile dataFile(ncFileName.c_str(), NcFile::Replace);
-
-    if (!dataFile.is_valid())
-    {
-        cout << "Couldn't open netcdf file!\n";
-        return -1;
-    }
-
-    setUpNetCDF(&dataFile, nFrames, nFish );
-    NcVar* pxy = dataFile.get_var("pxy");
-
-    // This is the data array we will write. It will just be filled
-    // with a progression of numbers for this example.
-    float dataOut[nFish][2];
-
-    for (int t=0;t<20;t++)
-    {
-    // Create some pretend data. If this wasn't an example program, we
-    // would have some real data to write, for example, model output.
-    for(int i = 0; i < nFish; i++)
-    {
-            dataOut[i][0] = i + 0.1;
-            dataOut[i][1] = t + 0.125;
-    }
-
-    // Write the pretend data to the file. Although netCDF supports
-    // reading and writing subsets of data, in this case we write all
-    // the data in one operation.
-    pxy->set_cur(t);
-    pxy->put(&dataOut[0][0], 1, nFish, 2);
-    }
-    // The file will be automatically close when the NcFile object goes
-    // out of scope. This frees up any internal netCDF resources
-    // associated with the file, and flushes any buffers.
-
-
-
-    string bkup = dataDir + "bk-up.png";
-    string bkdown = dataDir + "bk-down.png";
-
-    /// read background images
-    Mat imBkUp = imread( bkup , IMREAD_GRAYSCALE);
-    Mat imBkDown = imread( bkdown, IMREAD_GRAYSCALE );
-
-    int rows = imBkUp.rows;
-    int cols = imBkUp.cols;
-    int split = 0.5*rows;
-
-    Mat imBk;
-
-    vconcat(imBkUp(Range(0,split), Range(0, cols)), imBkDown(Range(split,rows),Range(0,cols)), imBk);
-
-    string mask = dataDir + "mask.png";
-
-    /// read mask image
-    Mat imMask = imread( mask, IMREAD_GRAYSCALE );
-
-
+    // **************************************************************************************************
     // set up the parameters for blob detection
+    // **************************************************************************************************
     SimpleBlobDetector::Params params;
     params.minDistBetweenBlobs = 1.0f;
     params.filterByInertia = false;
@@ -93,16 +31,75 @@ int main( int argc, char** argv )
     blob_detector->create("SimpleBlob");
 
     vector<KeyPoint> keypoints;
+    string dataDir = "/home/ctorney/data/fishPredation/";
+    string bkup = dataDir + "bk-up.png";
+    string bkdown = dataDir + "bk-down.png";
+
+    // **************************************************************************************************
+    // setup background images
+    // **************************************************************************************************
+    Mat imBkUp = imread( bkup , IMREAD_GRAYSCALE);
+    Mat imBkDown = imread( bkdown, IMREAD_GRAYSCALE );
+
+    int rows = imBkUp.rows;
+    int cols = imBkUp.cols;
+    int split = 0.5*rows;
+
+    Mat imBk;
+
+    vconcat(imBkUp(Range(0,split), Range(0, cols)), imBkDown(Range(split,rows),Range(0,cols)), imBk);
+    
+    //imwrite( "bk.png", imBk );
+
+
+    string mask = dataDir + "mask.png";
+
+    // **************************************************************************************************
+    // create mask image
+    // **************************************************************************************************
+    Mat imMask = imread( mask, IMREAD_GRAYSCALE );
+
+    // **************************************************************************************************
+    // open the movie
+    // **************************************************************************************************
+    string trialName = "MVI_3371";
+
     string movie = dataDir + "sampleVideo/" + trialName + ".avi";
     VideoCapture cap(movie);
     if (!cap.isOpened())
     {
-        std::cout << "!!! Failed to open file: " << movie << std::endl;
+        cout << "Failed to open avi file: " << movie << endl;
         return -1;
     }
 
     int fCount = cap.get(CV_CAP_PROP_FRAME_COUNT );
     int fStart = 200;
+    int nFrames = fCount - fStart;
+    int nFish = 4;
+
+    // **************************************************************************************************
+    // create the netcdf file
+    // **************************************************************************************************
+    string ncFileName = dataDir + "tracked/" + trialName + ".nc";
+    NcFile dataFile(ncFileName.c_str(), NcFile::Replace);
+
+    if (!dataFile.is_valid())
+    {
+        cout << "Couldn't open netcdf file!\n";
+        return -1;
+    }
+
+    setUpNetCDF(&dataFile, nFrames, nFish );
+
+    // get the variable to store the positions
+    NcVar* pxy = dataFile.get_var("pxy");
+    NcVar* frNum = dataFile.get_var("frNum");
+
+    // **************************************************************************************************
+    // loop over all frames and record positions
+    // **************************************************************************************************
+
+    bool visuals = false;
     Mat frame, gsFrame;
     for(int f=0;f<fCount;f++)
     {
@@ -111,27 +108,48 @@ int main( int argc, char** argv )
         if (f<fStart)
             continue;
 
+        // convert to grayscale
         cvtColor( frame, gsFrame, CV_BGR2GRAY );
+        // subtract background
         absdiff(imBk,gsFrame, gsFrame);
-
-
+        // select region of interest using mask
         bitwise_and(gsFrame, imMask, gsFrame);
+        // find the blobs
         blob_detector->detect(gsFrame, keypoints);
+        // create array for output
+        float dataOut[nFish][2];
+        for (int i=0;i<nFish;i++)
+            dataOut[i][0]=dataOut[i][1]=-1.0f;
 
-        // extract the x y coordinates of the keypoints: 
-
-        for (int i=0; i<keypoints.size(); i++){
-            float X=keypoints[i].pt.x; 
-            float Y=keypoints[i].pt.y;
-            circle( frame,keypoints[i].pt, 8, Scalar( 25, 125, 125 ), -1, 8);
+        // extract the x y coordinates of the keypoints
+        // use only the first 4 as keypoints are sorted according to quality 
+        int foundPoints = keypoints.size();
+        if (foundPoints>nFish)
+            foundPoints = nFish;
+        for (int i=0; i<foundPoints; i++)
+        {
+            dataOut[i][0] = keypoints[i].pt.x; 
+            dataOut[i][1] = keypoints[i].pt.y;
+            if (visuals)
+                circle( frame,keypoints[i].pt, 8, Scalar( 25, 125, 125 ), -1, 8);
         }
 
-        pyrDown(frame, frame) ;
-        imshow("detected individuals", frame);
+        pxy->set_cur(f - fStart);
+        frNum->set_cur(f - fStart);
+        pxy->put(&dataOut[0][0], 1, nFish, 2);
+        frNum->put(&f, 1);
 
-        char key = cvWaitKey(10);
-        if (key == 27) // ESC
-            break;
+
+        if (visuals)
+        {
+            pyrDown(frame, frame) ;
+            imshow("detected individuals", frame);
+
+
+            char key = cvWaitKey(10);
+            if (key == 27) // ESC
+                break;
+        }
     }
 
     return 0;
@@ -139,29 +157,18 @@ int main( int argc, char** argv )
 
 int setUpNetCDF(NcFile* dataFile, int nFrames, int nFish)
 {
- //   dataFile->set_fill(NcFile::NoFill);
-//    return 0;
     // dimension for each frame
     NcDim* frDim = dataFile->add_dim("frame", nFrames);
     // dimension for individual fish
     NcDim* iDim = dataFile->add_dim("fish", nFish);
     // xy dimension for vectors
     NcDim* xyDim = dataFile->add_dim("xy", 2);
-    // dimension for tracks (unlimited as new tracks are created when a fish is lost)
-    NcDim* trDim = dataFile->add_dim("track");
 
     // define a netCDF variable for the positions of individuals
     dataFile->add_var("pxy", ncFloat, frDim, iDim, xyDim);
-    // define a netCDF variable for the positions of linked tracks
-    dataFile->add_var("trxy", ncFloat, trDim, frDim, xyDim);
-    // linked tracks following smoothing
-    dataFile->add_var("trxy_sm", ncFloat, trDim, frDim, xyDim);
-    // velocities
-    dataFile->add_var("tr_vel", ncFloat, trDim, frDim, xyDim);
-    // accelerations 
-    dataFile->add_var("tr_accel", ncFloat, trDim, frDim, xyDim);
-    // variable for ID of fish
-    dataFile->add_var("fid", ncShort, trDim, frDim);
+    // define a netCDF variable for the frame number to account 
+    // for any offset needed to remove experimental set-up
+    dataFile->add_var("frNum", ncInt, frDim);
 
     return 0;
 

@@ -37,10 +37,6 @@ def main():
  #   print fid[0,0]
  #   f.sync() 
 
-    fishIDs[237,:]=0 
-    fishIDs[238,:]=1
-    fishIDs[243,:]=2
-    fishIDs[244,:]=3
 
     [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
     
@@ -59,10 +55,13 @@ def main():
     d[0]=1
     d[-1]=1
     idx, = d.nonzero()    
+    # because diff calculates f(n)-f(n+1) we need the next entry found for all except d[0]
+    idx[idx>0]=idx[idx>0]+1
+
     conCounts =  idx[1:-1] - idx[0:-1-1]
    
     # array of all tracks || length of time tracks are present || number of tracks || start index || stop index || start frame of movie || stop frame of movie
-    mainTrackList = np.column_stack((trackCount[idx[0:-1-1]+1], conCounts, idx[0:-1-1],idx[1:-1], trFrames[idx[0:-1-1]], trFrames[idx[1:-1]]))
+    mainTrackList = np.column_stack((trackCount[idx[0:-1-1]], conCounts, idx[0:-1-1],idx[1:-1], trFrames[idx[0:-1-1]], trFrames[idx[1:-1]]))
     
     ind = np.lexsort((-mainTrackList[:,1],-mainTrackList[:,0]))
     mainTrackList = mainTrackList[ind,:].astype(int)
@@ -83,33 +82,40 @@ def main():
     vir = VirtualCamera(movieName, "video")
     #display = Display()
     for nb in range(1,numBlocks):
-    
         thisBlockSize = mainTrackList[nb,TRACKLENGTH]
         thisTrackCount = mainTrackList[nb,TRACKCOUNT]
         frStart = mainTrackList[nb,FRMSTART]
         indexStart = mainTrackList[nb,INDSTART]
+        indexStop = mainTrackList[nb,INDSTOP]
         
         score = np.zeros((thisTrackCount,4))
         liveTracks = trackIndex[timeIndex[:]==indexStart+1]
         counter = np.zeros_like(liveTracks)
         box_dim = 50    
-        for fr in range(thisBlockSize):
-            thisIm = vir.getFrame(fr+frStart).toGray()
+
+        liveTracks = trackIndex[timeIndex[:]==indexStart]
+         
+
+        counter = np.zeros_like(liveTracks)
+        box_dim = 50    
+        for fr in range(indexStart, indexStop):
+            thisIm = vir.getFrame(trFrames[fr]).toGray()
             thisIm = Image(cv2.absdiff(thisIm.getGrayNumpyCv2(), bkGrnd.getGrayNumpyCv2()), cv2image=True)
             thisIm = thisIm.applyBinaryMask(mask)
-            
+        
             for tr in range(thisTrackCount):
-                
-                if fishIDs[[liveTracks[tr],fr+indexStart+1]<0:
-                    xp = trackList[liveTracks[tr], fr+indexStart+1,0]
-                    yp = trackList[liveTracks[tr], fr+indexStart+1,1]
-                
-                    tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
-                    fishGuess = cl.classify(tmpImg)
-                    int1, =  np.where(classes==fishGuess)
-                    score[tr,int1]+=1
+            
+          
+                if fishIDs[liveTracks[tr],fr]<0:        
+                    xp = trackList[liveTracks[tr], fr, 0]
+                    yp = trackList[liveTracks[tr], fr, 1]
+                    if xp>0:        
+                        tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
+                        fishGuess = cl.classify(tmpImg)
+                        int1, =  np.where(classes==fishGuess)
+                        score[tr,int1]+=1
                 else:
-                    score[tr,fishIDs[[liveTracks[tr],fr+indexStart+1]]+=1
+                    score[tr,fishIDs[liveTracks[tr],fr]]+=1
         
         assignment = np.argmax(score,axis=1)
         
@@ -120,13 +126,13 @@ def main():
 
 
         for tr in range(thisTrackCount):
-            fishIDs[[liveTracks[tr],:] = assignment[tr]
+            fishIDs[liveTracks[tr],:] = assignment[tr]
 
         print score
     
         
 
-    display.quit()
+#    display.quit()
     
     return
     

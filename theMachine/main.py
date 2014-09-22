@@ -17,6 +17,8 @@ def main():
     trackList = np.empty_like (trXY)
     np.copyto(trackList,trXY)
 
+    fid = f.variables['fid']  
+    fishIDs = -np.ones(np.shape(fid),'int16')
     frNum = f.variables['frNum']
     trFrames = []
     trFrames = np.empty_like(frNum)
@@ -38,11 +40,14 @@ def main():
 
     d[0]=1
     d[-1]=1
-    idx, = d.nonzero()    
+    idx, = d.nonzero()
+    # because diff calculates f(n)-f(n+1) we need the next entry found for all except d[0]
+    idx[idx>0]=idx[idx>0]+1
+
     conCounts =  idx[1:-1] - idx[0:-1-1]
    
     # array of all tracks || length of time tracks are present || number of tracks || start index || stop index || start frame of movie || stop frame of movie
-    mainTrackList = np.column_stack((trackCount[idx[0:-1-1]+1], conCounts, idx[0:-1-1],idx[1:-1], trFrames[idx[0:-1-1]], trFrames[idx[1:-1]]))
+    mainTrackList = np.column_stack((trackCount[idx[0:-1-1]], conCounts, idx[0:-1-1],idx[1:-1], trFrames[idx[0:-1-1]], trFrames[idx[1:-1]]))
     
     ind = np.lexsort((-mainTrackList[:,1],-mainTrackList[:,0]))
     mainTrackList = mainTrackList[ind,:].astype(int)
@@ -72,36 +77,46 @@ def main():
         direct = trialName + str(tr)
         if not os.path.exists(direct):
             os.makedirs(direct)
-    liveTracks = trackIndex[timeIndex[:]==indexStart+1]
+    liveTracks = trackIndex[timeIndex[:]==indexStart]
+    startIndex = np.min(timeIndex[np.in1d(trackIndex,liveTracks)])
+
+    stopIndex = np.max(timeIndex[np.in1d(trackIndex,liveTracks)])
+
+    print liveTracks
+
+ for tr in range(thisTrackCount):
+            fishIDs[liveTracks[tr],:] = assignment[tr]
     counter = np.zeros_like(liveTracks)
     box_dim = 50    
-    for fr in range(1):#range(thisBlockSize):
-        thisIm = vir.getFrame(fr+frStart).toGray()
+    for fr in range(startIndex, stopIndex):
+        thisIm = vir.getFrame(trFrames[fr]).toGray()
         thisIm = Image(cv2.absdiff(thisIm.getGrayNumpyCv2(), bkGrnd.getGrayNumpyCv2()), cv2image=True)
         thisIm = thisIm.applyBinaryMask(mask)
         
         for tr in range(thisTrackCount):
-            direct = trialName + str(tr)
-            print liveTracks[tr]
-            xp = trackList[liveTracks[tr], fr+indexStart+1,0]
-            yp = trackList[liveTracks[tr], fr+indexStart+1,1]
-           
-            tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
-            save_path = direct + "/img-" + str(counter[tr]) + ".png"
-            tmpImg.save(save_path)
-            counter[tr]+=1
+            
+          
+            
+            xp = trackList[liveTracks[tr], fr,0]
+            yp = trackList[liveTracks[tr], fr,1]
+            if xp>0:
+                direct = trialName + str(tr) 
+                tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
+                save_path = direct + "/img-" + str(counter[tr]) + ".png"
+                tmpImg.save(save_path)
+                counter[tr]+=1
             
         
-        thisIm.save(display)
+#        thisIm.save(display)
     
         
-
+    return
             
-    display.quit()
-    fid = f.variables['fid']    
-    print np.shape(fid)
+    #display.quit()
+    #fid = f.variables['fid']    
+    #print np.shape(fid)
     #for p in fid: print p
-    print trXY[0,0,0]
+    #print trXY[0,0,0]
     fid.assignValue( (np.ones(np.shape(fid),'int16')))
     print fid[0,0]
     f.sync() 

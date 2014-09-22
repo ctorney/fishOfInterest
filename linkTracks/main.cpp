@@ -78,11 +78,13 @@ int main( int argc, char** argv )
     // get the variable that stores the positions and velocities
     // **************************************************************************************************
     NcVar* pxy = inputFile.get_var("pxy");
+    NcVar* frNum = inputFile.get_var("frNum");
 
     NcVar* xy = outputFile.get_var("trXY");
     NcVar* v = outputFile.get_var("trVel");
     NcVar* a = outputFile.get_var("trAccel");
     NcVar* fid = outputFile.get_var("fid");
+    NcVar* outFrame = outputFile.get_var("frNum");
 
     int totalTracks = 0;
     track *allTracks = new track[totalFish];
@@ -95,6 +97,11 @@ int main( int argc, char** argv )
         float* dataXY = new float[totalFish*2];
         pxy->set_cur(f);
         pxy->get(dataXY, 1, totalFish, 2);
+        int* curFrame = new int[1];
+        frNum->set_cur(f);
+        frNum->get(curFrame, 1);
+        outFrame->set_cur(f);
+        outFrame->put(curFrame, 1);
         
         // main call to track linking
         totalTracks = assignTracks(allTracks, dataXY, totalFish, totalTracks, f);
@@ -140,6 +147,8 @@ int setUpNetCDF(NcFile* dataFile, int nFrames)
     dataFile->add_var("trAccel", ncFloat, trDim, frDim, xyDim);
     // variable for ID of fish
     dataFile->add_var("fid", ncShort, trDim, frDim);
+    // variable for the frame number
+    dataFile->add_var("frNum", ncInt, frDim);
 
     return 0;
 
