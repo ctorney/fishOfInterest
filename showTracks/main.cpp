@@ -53,8 +53,10 @@ int main( int argc, char** argv )
     NcDim* trDim = dataFile.get_dim("track");
     int totalTracks = trDim->size();
     float *dataOut = new float[totalTracks*2];
+    float *fidOut = new float[totalTracks];
     // get the variable to store the positions
     NcVar* xy = dataFile.get_var("trXY");
+    NcVar* fid = dataFile.get_var("fid");
 
     // **************************************************************************************************
     // loop over all frames and record positions
@@ -65,6 +67,7 @@ int main( int argc, char** argv )
  //       for (int t=0;t<totalTracks;t++)
    //         cout<<dataOut[t*2  ]<<" "<<dataOut[t*2 + 1]<<endl;
      //   return 0;
+    cout<<fCount<<endl;
     for(int f=0;f<fCount;f++)
     {
         if (!cap.read(frame))             
@@ -76,23 +79,26 @@ int main( int argc, char** argv )
  //       xy->set_cur(0, f - fStart, 0, 0);
         xy->set_cur(0, f-fStart, 0);
         xy->get(dataOut, totalTracks, 1, 2);
+        fid->set_cur(0, f-fStart, 0);
+        fid->get(fidOut, totalTracks, 1);
  //       xy->get(&dataOut[0][0], totalTracks, 1, 2);
 
 
- //       for (int t=0;t<totalTracks;t++)
- //           cout<<dataOut[t][0]<<" "<<dataOut[t][1]<<endl;
-        cout<<"~~~~~~~~~~~~~~~~~~~"<<endl;
-        int col = 0;
+  //      for (int t=0;t<totalTracks;t++)
+  //          if ((dataOut[t*2]>0)&&(fidOut[t]>=0))
+  //              cout<<fidOut[t]<<endl;
+        cout<<"~~~~~~~~~"<<f<<"~~~~~~~~~~"<<endl;
         for (int t=0;t<totalTracks;t++)
-            if (dataOut[t*2]>0)
+            if ((dataOut[t*2]>0)&&(fidOut[t]>=0))
             {
                 ostringstream ss;
                 ss << t;
+                int col=fidOut[t];
  //               int col = (t%nFish);
  //               putText(frame, ss.str(), Point2f((int)dataOut[t*2]+offset, (int)dataOut[t*2 + 1]+offset), FONT_HERSHEY_PLAIN, 2,  Scalar(0,0,255,255));
                 cvDrawDottedRect(&frame, (int)dataOut[t*2], (int)dataOut[t*2 + 1], colors[col]);
-                col++;
-                cout<<t<<endl;
+   //             cout<<t<<endl;
+                cout<<fidOut[t]<<endl;
             }
 
         pyrDown(frame, frame) ;

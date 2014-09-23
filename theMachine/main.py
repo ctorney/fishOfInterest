@@ -1,7 +1,8 @@
-import SimpleCV
+#import SimpleCV
 from SimpleCV import Image,  VirtualCamera, Display, Color
 import numpy as np
-import Scientific.IO.NetCDF as DataSet
+import Scientific.IO.NetCDF as Dataset
+#from netCDF4 import Dataset
 import cv2
 import os
 
@@ -9,7 +10,7 @@ def main():
     dataDir = '/home/ctorney/data/fishPredation/'
     trialName = "MVI_3371"
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
-    f = DataSet.NetCDFFile(ncFileName, 'a')
+    f = Dataset.NetCDFFile(ncFileName, 'a')
 
 
     trXY = f.variables['trXY']
@@ -18,7 +19,13 @@ def main():
     np.copyto(trackList,trXY)
 
     fid = f.variables['fid']  
+    
+    
     fishIDs = -np.ones(np.shape(fid),'int16')
+    
+    
+    
+    
     frNum = f.variables['frNum']
     trFrames = []
     trFrames = np.empty_like(frNum)
@@ -66,7 +73,7 @@ def main():
     mask  = Image(dataDir + "maskmono.png")
  
     vir = VirtualCamera(movieName, "video")
-    display = Display()
+    #display = Display()
     nb = 0
     
     thisBlockSize = mainTrackList[nb,TRACKLENGTH]
@@ -84,8 +91,15 @@ def main():
 
     print liveTracks
 
- for tr in range(thisTrackCount):
-            fishIDs[liveTracks[tr],:] = assignment[tr]
+    for tr in range(thisTrackCount):
+        fishIDs[liveTracks[tr],:] = tr
+        
+    fid.assignValue( (fishIDs))
+    f.sync()
+    f.close()
+    
+    
+    return
     counter = np.zeros_like(liveTracks)
     box_dim = 50    
     for fr in range(startIndex, stopIndex):
@@ -110,17 +124,14 @@ def main():
 #        thisIm.save(display)
     
         
-    return
+    
             
     #display.quit()
     #fid = f.variables['fid']    
     #print np.shape(fid)
     #for p in fid: print p
     #print trXY[0,0,0]
-    fid.assignValue( (np.ones(np.shape(fid),'int16')))
-    print fid[0,0]
-    f.sync() 
-
+    
     return
     
     movieName = dataDir + "sampleVideo/" + trialName + ".avi";

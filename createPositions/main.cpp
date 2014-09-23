@@ -49,7 +49,7 @@ int main( int argc, char** argv )
 
     vconcat(imBkUp(Range(0,split), Range(0, cols)), imBkDown(Range(split,rows),Range(0,cols)), imBk);
     
-    //imwrite( "bk.png", imBk );
+//    imwrite( "bk.png", imBk );
 
 
     string mask = dataDir + "mask.png";
