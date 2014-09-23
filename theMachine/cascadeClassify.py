@@ -78,8 +78,9 @@ FRMSTART = 4
 FRMSTOP = 5
 classes =np.array(['0','1','2','3'])
 tmpDirs =np.array([trialName + 'TMP-0', trialName + 'TMP-1', trialName + 'TMP-2', trialName + 'TMP-3'])
-numBlocks =  np.size(mainTrackList,0)
-numBlocks = 10
+# only do the complete segments
+numBlocks = np.sum(mainTrackList[:,TRACKCOUNT]==NUMFISH)# np.size(mainTrackList,0)
+#numBlocks = 10
 movieName = dataDir + "sampleVideo/" + trialName + ".avi";
 bkGrnd = Image(dataDir + "bk.png")
 mask  = Image(dataDir + "maskmono.png")
@@ -94,7 +95,10 @@ for nf in range(NUMFISH):
 for nb in range(1, numBlocks):
     print nb, numBlocks
     for nf in range(NUMFISH):
-        os.remove(tmpDirs[nf])
+        #os.remove(tmpDirs[nf] + "/*")
+        fileList = os.listdir(tmpDirs[nf])
+        for fileName in fileList:
+            os.remove(tmpDirs[nf]+"/"+fileName)
     thisBlockSize = mainTrackList[nb,TRACKLENGTH]
     thisTrackCount = mainTrackList[nb,TRACKCOUNT]
     frStart = mainTrackList[nb,FRMSTART]
@@ -102,7 +106,7 @@ for nb in range(1, numBlocks):
     indexStop = mainTrackList[nb,INDSTOP]
     
     score = np.zeros((thisTrackCount,4))
-    liveTracks = trackIndex[timeIndex[:]==indexStart+1]
+    liveTracks = trackIndex[timeIndex[:]==indexStart]
     counter = np.zeros_like(liveTracks)
     box_dim = 50    
 
@@ -126,8 +130,9 @@ for nb in range(1, numBlocks):
                     tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
                     fishGuess = cl.classify(tmpImg)
                     int1, =  np.where(classes==fishGuess)
+                    #int1 = (tr+nb)%NUMFISH
                     score[tr,int1]+=1
-                    save_path = tmpDirs[tr] + "/img-" + str(fr) "-" + str(nb) + ".png"
+                    save_path = tmpDirs[tr] + "/img-" + str(fr) + "-" + str(nb) + ".png"
                     tmpImg.save(save_path)
             else:
                 score[tr,fishIDs[liveTracks[tr],fr]]+=1
@@ -138,13 +143,22 @@ for nb in range(1, numBlocks):
         if np.sum(assignment==assignment[avals])>1: 
             assignment[assignment==assignment[avals]]=-1
 
-
-    print assignment
-    print score
-    print liveTracks
-    print indexStart, indexStop
-    for tr in range(thisTrackCount):
-        fishIDs[liveTracks[tr],:] = assignment[tr]
+    if np.all( assignment>=0):
+        # all good so copy to learning folders
+        for tr in range(thisTrackCount):
+            sourceDir = tmpDirs[tr]
+            destDir =trialName + str( assignment[tr])
+            os.system("mv " + sourceDir + "/* " + destDir        )
+            
+        print fishIDs[trackList[:,1500,0]>0,1500]
+    
+        print assignment
+        print score
+        print liveTracks
+        print indexStart, indexStop
+        for tr in range(thisTrackCount):
+            if fishIDs[liveTracks[tr],0]<0:
+                fishIDs[liveTracks[tr],:] = assignment[tr]
 
 #    print score
 fid.assignValue( (fishIDs))
