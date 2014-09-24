@@ -5,7 +5,7 @@ import Scientific.IO.NetCDF as Dataset
 
 import cv2
 import os
-from SimpleCV import SVMClassifier, TreeClassifier
+from SimpleCV import SVMClassifier, TreeClassifier,KNNClassifier
 
 
 from circularHOGExtractor import circularHOGExtractor
@@ -19,6 +19,7 @@ f = Dataset.NetCDFFile(ncFileName, 'a')
 NUMFISH = 4
 
 cl = SVMClassifier.load('trainedSVM.xml')
+#cl = KNNClassifier.load('trainedKNN.xml')
 #cl = TreeClassifier.load('trainedTREE.xml')
 trXY = f.variables['trXY']
 trackList = []
@@ -92,64 +93,75 @@ for nf in range(NUMFISH):
     if not os.path.exists(tmpDirs[nf]):
         os.makedirs(tmpDirs[nf])
 
-for nb in range(1, numBlocks):
-    print nb, numBlocks
-    for nf in range(NUMFISH):
-        #os.remove(tmpDirs[nf] + "/*")
-        fileList = os.listdir(tmpDirs[nf])
-        for fileName in fileList:
-            os.remove(tmpDirs[nf]+"/"+fileName)
-    thisBlockSize = mainTrackList[nb,TRACKLENGTH]
-    thisTrackCount = mainTrackList[nb,TRACKCOUNT]
-    frStart = mainTrackList[nb,FRMSTART]
-    indexStart = mainTrackList[nb,INDSTART]
-    indexStop = mainTrackList[nb,INDSTOP]
+numPasses = 1
+for nPass in range(numPasses):
+    for nb in range(1, numBlocks):
+        print nb, numBlocks
+        #for nf in range(NUMFISH):
+            #os.remove(tmpDirs[nf] + "/*")
+         #   fileList = os.listdir(tmpDirs[nf])
+          #  for fileName in fileList:
+           #     os.remove(tmpDirs[nf]+"/"+fileName)
+        thisBlockSize = mainTrackList[nb,TRACKLENGTH]
+        thisTrackCount = mainTrackList[nb,TRACKCOUNT]
+        frStart = mainTrackList[nb,FRMSTART]
+        indexStart = mainTrackList[nb,INDSTART]
+        indexStop = mainTrackList[nb,INDSTOP]
     
-    score = np.zeros((thisTrackCount,4))
-    liveTracks = trackIndex[timeIndex[:]==indexStart]
-    counter = np.zeros_like(liveTracks)
-    box_dim = 50    
-
-    liveTracks = trackIndex[timeIndex[:]==indexStart]
-     
-
-    counter = np.zeros_like(liveTracks)
-    box_dim = 50    
-    for fr in range(indexStart, indexStop):
-        thisIm = vir.getFrame(trFrames[fr]).toGray()
-        thisIm = Image(cv2.absdiff(thisIm.getGrayNumpyCv2(), bkGrnd.getGrayNumpyCv2()), cv2image=True)
-        thisIm = thisIm.applyBinaryMask(mask)
+        score = np.zeros((thisTrackCount,NUMFISH))
+        liveTracks = trackIndex[timeIndex[:]==indexStart]
+        counter = np.zeros_like(liveTracks)
+        box_dim = 50    
     
+        liveTracks = trackIndex[timeIndex[:]==indexStart]
+        blockList = -np.ones((thisTrackCount,NUMFISH))
         for tr in range(thisTrackCount):
+            for nf in range(NUMFISH):
+                otherTracks = np.unique(trackIndex[np.in1d(timeIndex,np.where(trackList[liveTracks[tr], :, 0]>0)[0])])
+                for ot in otherTracks:
+                    if fishIDs[ot,0]>=0:
+                        blockList[tr, fishIDs[ot,0]]=fishIDs[ot,0]
+    
+    
+    
+        counter = np.zeros_like(liveTracks)
+        box_dim = 50    
+        for fr in range(indexStart, indexStop):
+            thisIm = vir.getFrame(trFrames[fr])
+            #thisIm = Image(cv2.absdiff(thisIm.getGrayNumpyCv2(), bkGrnd.getGrayNumpyCv2()), cv2image=True)
+            #thisIm = thisIm.applyBinaryMask(mask)
+    
+            for tr in range(thisTrackCount):
+    
+    
+                if fishIDs[liveTracks[tr],fr]<0:        
+                    xp = trackList[liveTracks[tr], fr, 0]
+                    yp = trackList[liveTracks[tr], fr, 1]
+                    if xp>0:        
+                        tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
+                        fishGuess = cl.classify(tmpImg)
+                        int1, =  np.where(classes==fishGuess)
+                        #int1 = (tr+nb)%NUMFISH
+                        if np.in1d(int1, blockList[tr,:],invert=True):
+                            score[tr,int1]+=1
+                        save_path = tmpDirs[tr] + "/img-" + str(fr) + "-" + str(nb) + ".png"
+                        #tmpImg.save(save_path)
+                else:
+                    score[tr,fishIDs[liveTracks[tr],fr]]+=1
         
-      
-            if fishIDs[liveTracks[tr],fr]<0:        
-                xp = trackList[liveTracks[tr], fr, 0]
-                yp = trackList[liveTracks[tr], fr, 1]
-                if xp>0:        
-                    tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
-                    fishGuess = cl.classify(tmpImg)
-                    int1, =  np.where(classes==fishGuess)
-                    #int1 = (tr+nb)%NUMFISH
-                    score[tr,int1]+=1
-                    save_path = tmpDirs[tr] + "/img-" + str(fr) + "-" + str(nb) + ".png"
-                    tmpImg.save(save_path)
-            else:
-                score[tr,fishIDs[liveTracks[tr],fr]]+=1
+        assignment = np.argmax(score,axis=1)
+        
+        for avals in range(np.size(assignment)): 
+            if np.sum(assignment==assignment[avals])>1: 
+                assignment[assignment==assignment[avals]]=-1
     
-    assignment = np.argmax(score,axis=1)
-    
-    for avals in range(np.size(assignment)): 
-        if np.sum(assignment==assignment[avals])>1: 
-            assignment[assignment==assignment[avals]]=-1
-
-    if np.all( assignment>=0):
-        # all good so copy to learning folders
-        for tr in range(thisTrackCount):
-            sourceDir = tmpDirs[tr]
-            destDir =trialName + str( assignment[tr])
-            os.system("mv " + sourceDir + "/* " + destDir        )
-            
+    #    if np.all( assignment>=0):
+    #        # all good so copy to learning folders
+    #        for tr in range(thisTrackCount):
+    #            sourceDir = tmpDirs[tr]
+    #            destDir =trialName + str( assignment[tr])
+    #            os.system("mv " + sourceDir + "/* " + destDir        )
+                
         print fishIDs[trackList[:,1500,0]>0,1500]
     
         print assignment
@@ -159,6 +171,17 @@ for nb in range(1, numBlocks):
         for tr in range(thisTrackCount):
             if fishIDs[liveTracks[tr],0]<0:
                 fishIDs[liveTracks[tr],:] = assignment[tr]
+
+    classList = np.array(range(NUMFISH))
+    
+    ## go through and make the 3s a 4
+    for fr in range(np.size(fishIDs,1)):
+        liveTracks = trackIndex[timeIndex[:]==fr]
+        liveClasses = fishIDs[liveTracks,0]
+        if np.sum(liveClasses>=0)==NUMFISH-1:
+            oddTrack = liveTracks[liveClasses<0]
+            missingClass = classList[np.in1d(classList,liveClasses, invert=True)]
+    #        fishIDs[oddTrack,:] = missingClass[0]
 
 #    print score
 fid.assignValue( (fishIDs))
@@ -174,5 +197,5 @@ f.close()
 
 
 
-if __name__ == "__main__":
-   main()
+#if __name__ == "__main__":
+#   main()

@@ -3,7 +3,7 @@
 import SimpleCV
 import time
 from SimpleCV import Image, VirtualCamera, Display, Features, TreeClassifier, ImageSet, Color
-from SimpleCV import SVMClassifier, TreeClassifier
+from SimpleCV import SVMClassifier, TreeClassifier, KNNClassifier
 import sys
 import random
 
@@ -22,8 +22,9 @@ hhf = HueHistogramFeatureExtractor ()
 
 #mf.extract(bt1)
 
-extractor = [ch] # put these all together
+extractor = [ch ] # put these all together
 svm = SVMClassifier(extractor) # try an svm, default is an RBF kernel function
+knn = KNNClassifier(extractor) # try an svm, default is an RBF kernel function
 tree = TreeClassifier(extractor,flavor='Boosted') # also try a decision tree
 tree.mBoostedFlavorDict['NTrees'] = 10
 #tree.mforestFlavorDict['NTrees'] = 200
@@ -32,9 +33,9 @@ trainPaths = ['./MVI_33710/','./MVI_33711/','./MVI_33712/','./MVI_33713/']
 classes = ['0','1','2','3']
 # # # train the data
 print svm.train(trainPaths,classes,verbose=True)
-#print tree.train(trainPaths,classes,verbose=True)
+#print knn.train(trainPaths,classes,verbose=True)
 svm.save('trainedSVM.xml')
-#tree.save('trainedTREE.xml')
+#knn.save('trainedKNN.xml')
 #
 #    outTest = False
 #

@@ -31,6 +31,14 @@ int main( int argc, char** argv )
     int fStart = 200;
     int nFrames = fCount - fStart;
     int nFish = 4;
+    Size S = Size((int) cap.get(CV_CAP_PROP_FRAME_WIDTH),    // Acquire input size
+            (int) cap.get(CV_CAP_PROP_FRAME_HEIGHT));
+
+    string outMovie = "./" + trialName + "_TRACKED.avi";
+    int ex = static_cast<int>(cap.get(CV_CAP_PROP_FOURCC)); 
+    VideoWriter outputVideo;      
+    outputVideo.open(outMovie, ex, cap.get(CV_CAP_PROP_FPS), S, true);
+
 
     Scalar colors[nFish];
     colors[0] = Scalar(255,255,255);
@@ -64,10 +72,10 @@ int main( int argc, char** argv )
 
     int offset = 10;
     Mat frame, gsFrame;
- //       for (int t=0;t<totalTracks;t++)
-   //         cout<<dataOut[t*2  ]<<" "<<dataOut[t*2 + 1]<<endl;
-     //   return 0;
-    cout<<fCount<<endl;
+    //       for (int t=0;t<totalTracks;t++)
+    //         cout<<dataOut[t*2  ]<<" "<<dataOut[t*2 + 1]<<endl;
+    //   return 0;
+    
     for(int f=0;f<fCount;f++)
     {
         if (!cap.read(frame))             
@@ -101,6 +109,7 @@ int main( int argc, char** argv )
                 cout<<fidOut[t]<<endl;
             }
 
+        outputVideo << frame;
         pyrDown(frame, frame) ;
         imshow("detected individuals", frame);
 
@@ -198,7 +207,7 @@ void cvDrawDottedLine(cv::Mat* img, Point pt1, Point pt2, CvScalar color, int th
 
 void cvDrawDottedRect(cv::Mat* img, int x, int y, CvScalar color)
 { 
-    int hwidth = 40;
+    int hwidth = 20;
     int corner = 4;
     int cross = 4;
 
