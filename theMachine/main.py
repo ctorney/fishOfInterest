@@ -103,8 +103,8 @@ def main():
     box_dim = 50    
     for fr in range(startIndex, stopIndex):
         thisIm = vir.getFrame(trFrames[fr])
-        #thisIm = Image(cv2.absdiff(thisIm.getNumpyCv2(), bkGrnd.getNumpyCv2()), cv2image=True)
-        #thisIm = thisIm.applyBinaryMask(mask)
+        thisIm = Image(cv2.absdiff(thisIm.getNumpyCv2(), bkGrnd.getNumpyCv2()), cv2image=True)
+        thisIm = thisIm.applyBinaryMask(mask)
         
         for tr in range(thisTrackCount):
             
