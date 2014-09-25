@@ -1,23 +1,15 @@
+#import SimpleCV
 from SimpleCV import Image,  VirtualCamera, Display, Color
 import numpy as np
 import Scientific.IO.NetCDF as Dataset
+#from netCDF4 import Dataset
 import cv2
 import os
 
 def main():
     dataDir = '/home/ctorney/data/fishPredation/'
     trialName = "MVI_3371"
-
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
-
-    for tr in range(thisTrackCount):
-        direct = trialName + str(tr)
-        if not os.path.exists(direct):
-            os.makedirs(direct)
-
-
-    
-
     f = Dataset.NetCDFFile(ncFileName, 'a')
 
 
@@ -88,6 +80,10 @@ def main():
     thisTrackCount = mainTrackList[nb,TRACKCOUNT]
     frStart = mainTrackList[nb,FRMSTART]
     indexStart = mainTrackList[nb,INDSTART]
+    for tr in range(thisTrackCount):
+        direct = trialName + str(tr)
+        if not os.path.exists(direct):
+            os.makedirs(direct)
     liveTracks = trackIndex[timeIndex[:]==indexStart]
     startIndex = np.min(timeIndex[np.in1d(trackIndex,liveTracks)])
 
