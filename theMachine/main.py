@@ -97,13 +97,13 @@ def main():
     fid.assignValue( (fishIDs))
     f.sync()
     f.close()
-    return    
+    
     
     counter = np.zeros_like(liveTracks)
     box_dim = 50    
     for fr in range(startIndex, stopIndex):
-        thisIm = vir.getFrame(trFrames[fr])
-        thisIm = Image(cv2.absdiff(thisIm.getNumpyCv2(), bkGrnd.getNumpyCv2()), cv2image=True)
+        thisIm = vir.getFrame(trFrames[fr]).toGray()
+        thisIm = Image(cv2.absdiff(thisIm.getGrayNumpyCv2(), bkGrnd.getGrayNumpyCv2()), cv2image=True)
         thisIm = thisIm.applyBinaryMask(mask)
         
         for tr in range(thisTrackCount):
