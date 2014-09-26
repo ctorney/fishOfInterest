@@ -6,7 +6,7 @@ import Scientific.IO.NetCDF as Dataset
 import cv2
 import os
 
-def createSampleImages(dataDir, trialName):
+def createSampleImages(dataDir, trialName, mainTrackList):
    
     # movie and images
     movieName = dataDir + "sampleVideo/" + trialName + ".avi";

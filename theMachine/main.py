@@ -6,6 +6,7 @@ import os
 from createSampleImages import createSampleImages
 from trainClassifier import trainClassifier
 from createPMatrix import createPMatrix
+from assignIDs import assignIDs
 
 def main():
     dataDir = '/home/ctorney/data/fishPredation/'
@@ -19,11 +20,17 @@ def main():
             os.makedirs(direct)
 
     mainTrackList = []
-#    createSampleImages(dataDir, trialName, mainTrackList)
-#    trainClassifier(trialName, NUMFISH)
+    print "creating sample images ..."
+    createSampleImages(dataDir, trialName, mainTrackList)
+    print "training the classifier ..."
+    trainClassifier(trialName, NUMFISH)
+
     allScores = []
     allLiveTracks = []
+    print "creating the proability matrix for each track  ..."
     createPMatrix(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTracks)
+    print "assign fish IDs to each track  ..."
+    assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTracks)
     return
     
 
