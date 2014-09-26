@@ -3,19 +3,28 @@ import numpy as np
 import Scientific.IO.NetCDF as Dataset
 import cv2
 import os
+from createSampleImages import createSampleImages
+from trainClassifier import trainClassifier
+from createPMatrix import createPMatrix
 
 def main():
     dataDir = '/home/ctorney/data/fishPredation/'
     trialName = "MVI_3371"
 
-    ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
+    NUMFISH = 4
 
-    for tr in range(thisTrackCount):
+    for tr in range(NUMFISH):
         direct = trialName + str(tr)
         if not os.path.exists(direct):
             os.makedirs(direct)
 
-
+    mainTrackList = []
+#    createSampleImages(dataDir, trialName, mainTrackList)
+#    trainClassifier(trialName, NUMFISH)
+    allScores = []
+    allLiveTracks = []
+    createPMatrix(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTracks)
+    return
     
 
     f = Dataset.NetCDFFile(ncFileName, 'a')

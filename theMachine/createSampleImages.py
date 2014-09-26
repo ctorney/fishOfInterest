@@ -6,91 +6,93 @@ import Scientific.IO.NetCDF as Dataset
 import cv2
 import os
 
-def main():
-    dataDir = '/home/ctorney/data/fishPredation/'
-    trialName = "MVI_3371"
+def createSampleImages(dataDir, trialName):
+   
+    # movie and images
+    movieName = dataDir + "sampleVideo/" + trialName + ".avi";
+    bkGrnd = Image(dataDir + "bk.png")
+    mask  = Image(dataDir + "maskmono.png")
+
+    # open netcdf file
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
     f = Dataset.NetCDFFile(ncFileName, 'a')
 
-
+    # get the positions variable
     trXY = f.variables['trXY']
     trackList = []
     trackList = np.empty_like (trXY)
     np.copyto(trackList,trXY)
 
-    fid = f.variables['fid']  
-    
-    
-    fishIDs = -np.ones(np.shape(fid),'int16')
-    
-    
-    
-    
+    # get the movie frame numbers
     frNum = f.variables['frNum']
     trFrames = []
     trFrames = np.empty_like(frNum)
     np.copyto(trFrames,frNum)
+
+    # get the fish identities
+    fid = f.variables['fid']  
+    fishIDs = -np.ones(np.shape(fid),'int16')
     
+    # these variables store the index values when a track is present
     [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
 
+    # to find where tracks come and go we sum all the track IDs at each time point
     maxTime = np.size(trackList,1)
-
     trackSum = np.zeros([maxTime])
     trackCount = np.zeros([maxTime])
     for k in range(maxTime): 
         trackSum[k]=sum(trackIndex[timeIndex[:]==k])
         trackCount[k]=np.size(trackIndex[timeIndex[:]==k])
 
-    print np.shape(trackSum)
-
+    # points where the sum of the track IDs change are when a track is lost or found
     d= np.diff(trackSum)
-
+    # mark the start and end points
     d[0]=1
     d[-1]=1
+    # now find where the tracks change
     idx, = d.nonzero()
     # because diff calculates f(n)-f(n+1) we need the next entry found for all except d[0]
     idx[idx>0]=idx[idx>0]+1
-
+    # the difference between the indices gives the length of each block of continuous tracks
     conCounts =  idx[1:-1] - idx[0:-1-1]
    
     # array of all tracks || length of time tracks are present || number of tracks || start index || stop index || start frame of movie || stop frame of movie
-    mainTrackList = np.column_stack((trackCount[idx[0:-1-1]], conCounts, idx[0:-1-1],idx[1:-1], trFrames[idx[0:-1-1]], trFrames[idx[1:-1]]))
+    mainTrackList = np.column_stack((trackCount[idx[0:-1-1]], conCounts, idx[0:-1-1],idx[1:-1]))
     
+    # now sort the array by order of length
     ind = np.lexsort((-mainTrackList[:,1],-mainTrackList[:,0]))
     mainTrackList = mainTrackList[ind,:].astype(int)
 
-    TRACKCOUNT = 0
-    TRACKLENGTH = 1
-    INDSTART = 2
-    INDSTOP = 3
-    FRMSTART = 4
-    FRMSTOP = 5
-    
     numBlocks =  np.size(mainTrackList,0)
 
-    movieName = dataDir + "sampleVideo/" + trialName + ".avi";
-    bkGrnd = Image(dataDir + "bk.png")
-    mask  = Image(dataDir + "maskmono.png")
- 
-    vir = VirtualCamera(movieName, "video")
-    #display = Display()
-    nb = 0
-    
-    thisBlockSize = mainTrackList[nb,TRACKLENGTH]
-    thisTrackCount = mainTrackList[nb,TRACKCOUNT]
-    frStart = mainTrackList[nb,FRMSTART]
-    indexStart = mainTrackList[nb,INDSTART]
-    for tr in range(thisTrackCount):
-        direct = trialName + str(tr)
-        if not os.path.exists(direct):
-            os.makedirs(direct)
-    liveTracks = trackIndex[timeIndex[:]==indexStart]
-    startIndex = np.min(timeIndex[np.in1d(trackIndex,liveTracks)])
+    # get the parameters for the longest track block 
+    thisTrackCount = mainTrackList[0,0]
+    indexStart = mainTrackList[0,2]
 
+    liveTracks = trackIndex[timeIndex[:]==indexStart]
+
+    startIndex = np.min(timeIndex[np.in1d(trackIndex,liveTracks)])
     stopIndex = np.max(timeIndex[np.in1d(trackIndex,liveTracks)])
 
-    print liveTracks
 
+    # now go through and store images from each track in a separate folder 
+    box_dim = 50    
+    vir = VirtualCamera(movieName, "video")
+    for fr in range(startIndex, stopIndex):
+        thisIm = vir.getFrame(trFrames[fr]).toGray()
+        thisIm = Image(cv2.absdiff(thisIm.getGrayNumpyCv2(), bkGrnd.getGrayNumpyCv2()), cv2image=True)
+        thisIm = thisIm.applyBinaryMask(mask)
+        
+        for tr in range(thisTrackCount):
+            xp = trackList[liveTracks[tr], fr,0]
+            yp = trackList[liveTracks[tr], fr,1]
+            if xp>0:
+                direct = trialName + str(tr) 
+                tmpImg = thisIm.crop(round(xp), round(yp), box_dim, box_dim, centered=True)
+                save_path = direct + "/img-" + str(fr) + ".png"
+                tmpImg.save(save_path)
+            
+    # store the IDs     
     for tr in range(thisTrackCount):
         fishIDs[liveTracks[tr],:] = tr
         
@@ -98,61 +100,8 @@ def main():
     f.sync()
     f.close()
     
-    
-    counter = np.zeros_like(liveTracks)
-    box_dim = 50    
-    for fr in range(startIndex, stopIndex):
-        thisIm = vir.getFrame(trFrames[fr]).toGray()
-        thisIm = Image(cv2.absdiff(thisIm.getGrayNumpyCv2(), bkGrnd.getGrayNumpyCv2()), cv2image=True)
-        thisIm = thisIm.applyBinaryMask(mask)
-        
-        for tr in range(thisTrackCount):
-            
-          
-            
-            xp = trackList[liveTracks[tr], fr,0]
-            yp = trackList[liveTracks[tr], fr,1]
-            if xp>0:
-                direct = trialName + str(tr) 
-                tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
-                save_path = direct + "/img-" + str(counter[tr]) + ".png"
-                tmpImg.save(save_path)
-                counter[tr]+=1
-            
-        
-#        thisIm.save(display)
-    
-        
-    
-            
-    #display.quit()
-    #fid = f.variables['fid']    
-    #print np.shape(fid)
-    #for p in fid: print p
-    #print trXY[0,0,0]
-    
     return
     
-    movieName = dataDir + "sampleVideo/" + trialName + ".avi";
-    print movieName
- 
-    vir = VirtualCamera(movieName, "video")
-    display = Display()
-    while display.isNotDone():
-
-        thisIm = vir.getImage()
-
-        thisIm.save(display)
-        
-        
-
-        if vir.getImage().getBitmap() == '': display.done = True
-        if display.mouseRight: display.done = True
-
-    display.quit()
 
 
 
-
-if __name__ == "__main__":
-   main()
