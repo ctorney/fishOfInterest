@@ -1,5 +1,5 @@
 
-
+import math
 import numpy as np
 from munkres import Munkres
 import Scientific.IO.NetCDF as Dataset
@@ -44,9 +44,12 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
     print pm
     
     # introduce a small error to account for the higher accuracy of training and testing on same set
-    eps = 0.50
+    eps = 0.250
     accMat = pm*(1.0-eps) + eps*0.25*np.ones_like(pm)
 
+    # autocorrelation parameter to discount the number of samples that are effectively pseudo-reps
+    # i.e. 10 images that are assigned to a track should only count as 1 due to the high frame rate
+    rho = 0.025
 
     allCosts = np.zeros_like(allScores)
     numBlocks = np.size(allScores,0)
@@ -55,7 +58,7 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
     # the cost value is defined as the negative log likelihood, and the assignment that 
     # minimizes this value will be used
     for block in range(1,numBlocks):
-        thisScore = allScores[block]
+        thisScore = rho*allScores[block]
         ps = np.ones((NUMFISH,NUMFISH))
         # for each block and each track i, we find P(id = i|X) where X is the sequence of observations
         # we use the individual assignment accuracy and Bayes theorem assuming each assignment is a priori
@@ -69,7 +72,7 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
                         d_add += (math.log(accMat[j,k])-math.log(accMat[m,k]))*thisScore[i,k]
                     
                     if d_add>709.0:
-                        denom = inf
+                        denom = np.inf
                     else:
                         denom += math.exp(d_add)
                 
@@ -98,12 +101,14 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
     while np.isfinite(allMunk).any():
         block = np.nanargmin(allMunk)
         # check if it doesn't contradict an earlier assignment
-        imPoss = checkSanity(allAssign[block,:,:], allLiveTracks[block,:], fishIDs, trackList)
+        imPoss = checkSanity(allAssign[block,:,:], allLiveTracks[block,:], fishIDs, trackList, NUMFISH)
         if (imPoss<0):
             # if it doesn't assign to fish and set the cost to nan to indicate it's done
             for i in range(NUMFISH):
                 thisTrack = int(allLiveTracks[block,i])
                 fishIDs[thisTrack,:] = int(allAssign[block,i,1])
+            print 'assigned fragment ' + str(block)
+            print allScores[block]
             allMunk[block]=np.nan
         else:
             # if it's impossible we set the cost of the assignmet to infinity
@@ -126,7 +131,7 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
     f.close()
     return
 
-def checkSanity(assignment, tracks, fishIDs, trackList):
+def checkSanity(assignment, tracks, fishIDs, trackList, NUMFISH):
 
     # check that this doesn't contradict an earlier assignment
     [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
