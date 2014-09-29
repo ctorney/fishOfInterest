@@ -6,7 +6,7 @@ import cv2
 
 from circularHOGExtractor import circularHOGExtractor
 
-def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTracks):
+def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
     # movie and images
     movieName = dataDir + "sampleVideo/" + trialName + ".avi";
     bkGrnd = Image(dataDir + "bk.png")
@@ -78,7 +78,7 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLive
 
     for nb in range( numBlocks):
         # get the parameters for the current track block 
-        indexStart = mainTrackList[0,2]
+        indexStart = mainTrackList[nb,2]
         indexStop = mainTrackList[nb,3]
 
         score = np.zeros((NUMFISH,NUMFISH))
@@ -86,7 +86,7 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLive
 
         for fr in range(indexStart, indexStop):
             # extract the frame
-            thisIm = vir.getFrame(trFrames[fr])
+            thisIm = vir.getFrame(trFrames[fr]).toGray()
             thisIm = Image(cv2.absdiff(thisIm.getGrayNumpyCv2(), bkGrnd.getGrayNumpyCv2()), cv2image=True)
             thisIm = thisIm.applyBinaryMask(mask)
 
@@ -98,9 +98,8 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLive
                     # extract the individual and classify
                     tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
                     fishGuess = cl.classify(tmpImg)
-                    int1, =  np.where(classes==fishGuess)
                     # record the score for this track
-                    score[tr,int1]+=1
+                    score[tr,int(fishGuess)]+=1
 
            
         # store the total score matrix for assigning each track to each possible identity 
@@ -112,5 +111,6 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLive
     f.sync()
     f.close()
 
+    return [allScores, allLiveTracks]
 
 

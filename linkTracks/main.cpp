@@ -147,6 +147,8 @@ int setUpNetCDF(NcFile* dataFile, int nFrames)
     dataFile->add_var("trAccel", ncFloat, trDim, frDim, xyDim);
     // variable for ID of fish
     dataFile->add_var("fid", ncShort, trDim, frDim);
+    // variable for certainty of ID assignment
+    dataFile->add_var("certID", ncFloat, trDim, frDim);
     // variable for the frame number
     dataFile->add_var("frNum", ncInt, frDim);
 

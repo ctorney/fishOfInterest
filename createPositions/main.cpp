@@ -38,8 +38,8 @@ int main( int argc, char** argv )
     // **************************************************************************************************
     // setup background images
     // **************************************************************************************************
-    Mat imBkUp = imread( bkup ,CV_LOAD_IMAGE_COLOR);
-    Mat imBkDown = imread( bkdown,CV_LOAD_IMAGE_COLOR);
+    Mat imBkUp = imread( bkup , IMREAD_GRAYSCALE);
+    Mat imBkDown = imread( bkdown, IMREAD_GRAYSCALE);
 
     int rows = imBkUp.rows;
     int cols = imBkUp.cols;
@@ -49,8 +49,7 @@ int main( int argc, char** argv )
 
     vconcat(imBkUp(Range(0,split), Range(0, cols)), imBkDown(Range(split,rows),Range(0,cols)), imBk);
     
-    imwrite( "bk.png", imBk );
-    return 0;
+    //imwrite( "bk.png", imBk );
 
 
     string mask = dataDir + "mask.png";

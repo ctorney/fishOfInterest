@@ -6,7 +6,7 @@ import Scientific.IO.NetCDF as Dataset
 import cv2
 import os
 
-def createSampleImages(dataDir, trialName, mainTrackList):
+def createSampleImages(dataDir, trialName):
    
     # movie and images
     movieName = dataDir + "sampleVideo/" + trialName + ".avi";
@@ -100,7 +100,7 @@ def createSampleImages(dataDir, trialName, mainTrackList):
     f.sync()
     f.close()
     
-    return
+    return mainTrackList
     
 
 

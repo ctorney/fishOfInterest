@@ -14,14 +14,20 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
     trackList = []
     trackList = np.empty_like (trXY)
     np.copyto(trackList,trXY)
+    [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
 
     # get the movie frame numbers
     fid = f.variables['fid']
     fishIDs = []
     fishIDs = np.empty_like(fid)
     np.copyto(fishIDs, fid)
+    cid = f.variables['certID']
+    certIDs = []
+    certIDs = np.empty_like(cid)
 
-
+    perms = []
+    permute(range(NUMFISH),perms)
+    
 
     # these variables store the index values when a track is present
     [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
@@ -44,7 +50,7 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
     print pm
     
     # introduce a small error to account for the higher accuracy of training and testing on same set
-    eps = 0.250
+    eps = 0.50
     accMat = pm*(1.0-eps) + eps*0.25*np.ones_like(pm)
 
     # autocorrelation parameter to discount the number of samples that are effectively pseudo-reps
@@ -58,7 +64,7 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
     # the cost value is defined as the negative log likelihood, and the assignment that 
     # minimizes this value will be used
     for block in range(1,numBlocks):
-        thisScore = rho*allScores[block]
+        thisScore = allScores[block]
         ps = np.ones((NUMFISH,NUMFISH))
         # for each block and each track i, we find P(id = i|X) where X is the sequence of observations
         # we use the individual assignment accuracy and Bayes theorem assuming each assignment is a priori
@@ -83,8 +89,11 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
 
     # now we have the negative log likelihood we find the assignment that minimizes this with the hungarian algorithm
     allAssign = np.zeros((numBlocks,NUMFISH,2))
-    allMunk = np.zeros((numBlocks))
-    allMunk[0]=np.nan
+    theStack = np.zeros((numBlocks))
+    theStack[0]=np.nan
+    
+    # hhhheeeerrrrreeeeee!!!!!!!!!!!
+    
     thisCost = np.zeros_like(allCosts[0,:,:])
     for block in range(1,numBlocks):
         np.copyto(thisCost, allCosts[block,:,:])
@@ -93,58 +102,100 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
         np.copyto(thisCost, allCosts[block,:,:])
         allAssign[block,:,:]=indexes
         # next we calculate the cost of the assignment
-        allMunk[block] = 0.0
+        theStack[block] = 0.0
         for i in indexes:
-            allMunk[block] += thisCost[i]
+            theStack[block] += thisCost[i]
 
+
+
+    certainty = 1.0
+    
+    
     # now we loop through and take the minimum cost assignment off the stack
-    while np.isfinite(allMunk).any():
-        block = np.nanargmin(allMunk)
-        # check if it doesn't contradict an earlier assignment
-        imPoss = checkSanity(allAssign[block,:,:], allLiveTracks[block,:], fishIDs, trackList, NUMFISH)
-        if (imPoss<0):
-            # if it doesn't assign to fish and set the cost to nan to indicate it's done
-            for i in range(NUMFISH):
-                thisTrack = int(allLiveTracks[block,i])
-                fishIDs[thisTrack,:] = int(allAssign[block,i,1])
-            print 'assigned fragment ' + str(block)
-            print allScores[block]
-            allMunk[block]=np.nan
-        else:
-            # if it's impossible we set the cost of the assignmet to infinity
-            wrong = allAssign[block,imPoss,:]
-            allCosts[block,wrong[0],wrong[1]] = np.inf
-            np.copyto(thisCost, allCosts[block,:,:])
-            # we make this assignment very expensive (munk can't handle inf)
-            thisCost[np.isinf(thisCost)] = 1e12
-            indexes = munk.compute(thisCost)
-            np.copyto(thisCost, allCosts[block,:,:])
-            # then store this assignment and cost - even if it's infinity, 
-            # if that's the case then it will be ignored and assumed to be unclassifiable
-            allAssign[block,:,:]=indexes
-            allMunk[block] = 0.0
-            for i in indexes:
-                allMunk[block] += thisCost[i]
+    while np.isfinite(theStack).any():
+        calculateAllCosts(allAssign, allCosts, allLiveTracks, theStack, perms, fishIDs, trackList, trackIndex, timeIndex, NUMFISH)
+        block = np.nanargmin(theStack)
+        if theStack[block]<certainty:
+            certainty = theStack[block]
+
+        # if it doesn't assign to fish and set the cost to nan to indicate it's done
+        for i in range(NUMFISH):
+            thisTrack = int(allLiveTracks[block,i])
+            fishIDs[thisTrack,:] = int(allAssign[block,i,1])
+            certIDs[thisTrack,:] = float(certainty)
+        print 'assigned fragment ' + str(block)
+        print allScores[block]
+        print allAssign[block]
+        print theStack[block]
+        print '================'
+        theStack[block]=np.nan
+       
 
     fid.assignValue( (fishIDs))
+    cid.assignValue( ( certIDS))
     f.sync()
     f.close()
     return
 
-def checkSanity(assignment, tracks, fishIDs, trackList, NUMFISH):
-
-    # check that this doesn't contradict an earlier assignment
-    [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
-    for i in range(NUMFISH):
-        t_id = tracks[i]
-        fish = assignment[i,1]
-        # we want to identify track t_id as fish
-        # first find overlapping tracks
-        otherTracks = np.unique(trackIndex[np.in1d(timeIndex,np.where(trackList[t_id, :, 0]>0)[0])])
-        for ot in otherTracks:
-            if ot!=t_id:
-                if fishIDs[ot,0]==fish:
-                    return i
+def calculateAllCosts(allAssign, allCosts, allLiveTracks, theStack, perms, fishIDs, trackList, trackIndex, timeIndex, NUMFISH):
+    
+    numBlocks = np.size(theStack,0)
+    thisCost = np.zeros_like(allCosts[0,:,:])
+    # first update the cost matrices based on the previous assignments
+    for block in range(1,numBlocks):
+        if np.isnan(theStack[block]): continue
+        for i in range(NUMFISH):
+            t_id = allLiveTracks[block, i]
+            fish = allAssign[block,i,1]
+            # we want to identify track t_id as fish
+            # first find overlapping tracks
+            otherTracks = np.unique(trackIndex[np.in1d(timeIndex,np.where(trackList[t_id, :, 0]>0)[0])])
+            for ot in otherTracks:
+                if ot!=t_id:
+                    if fishIDs[ot,0]==fish:
+                        wrong = allAssign[block,i,:]
+                        allCosts[block,wrong[0],wrong[1]] = np.inf
         
-    return -1
+        np.copyto(thisCost, allCosts[block,:,:])
+        # this is the assignment
+        [indexes, stackCost] = findOptimalAssignment(thisCost, perms, NUMFISH)
+        
+        allAssign[block,:,:]=indexes
+        theStack[block] = stackCost
+        
 
+def findOptimalAssignment(thisCost, perms, NUMFISH):
+
+    n = np.size(perms,0)
+    possCosts = np.zeros((2,math.factorial(NUMFISH)), dtype=float)
+    
+    for i in range(n):
+        possCosts[0,i]=i
+        for j in range(NUMFISH):
+            possCosts[1,i]+= thisCost[j,perms[i][j]]
+
+
+    # now sort the array by order of length
+    
+    ind = np.lexsort(possCosts)
+
+    
+    if possCosts[1,ind[1]]==0:
+        return np.column_stack((range(NUMFISH),perms[ind[0]])), np.inf
+    else:
+        return np.column_stack((range(NUMFISH),perms[ind[0]])), possCosts[1,ind[0]]/possCosts[1,ind[1]]
+    
+    
+def permute(a, results):
+    if len(a) == 1:
+        results.insert(len(results), a)
+
+    else:
+        for i in range(0, len(a)):
+            element = a[i]
+            a_copy = [a[j] for j in range(0, len(a)) if j != i]
+            subresults = []
+            permute(a_copy, subresults)
+            for subresult in subresults:
+                result = [element] + subresult
+                results.insert(len(results), result)
