@@ -62,15 +62,17 @@ int main( int argc, char** argv )
     int totalTracks = trDim->size();
     float *dataOut = new float[totalTracks*2];
     float *fidOut = new float[totalTracks];
+    float *certOut = new float[totalTracks];
     // get the variable to store the positions
     NcVar* xy = dataFile.get_var("trXY");
     NcVar* fid = dataFile.get_var("fid");
+    NcVar* cert = dataFile.get_var("certID");
 
     // **************************************************************************************************
     // loop over all frames and record positions
     // **************************************************************************************************
 
-    int offset = 10;
+    int offset = 25;
     Mat frame, gsFrame;
     //       for (int t=0;t<totalTracks;t++)
     //         cout<<dataOut[t*2  ]<<" "<<dataOut[t*2 + 1]<<endl;
@@ -89,25 +91,30 @@ int main( int argc, char** argv )
         xy->get(dataOut, totalTracks, 1, 2);
         fid->set_cur(0, f-fStart, 0);
         fid->get(fidOut, totalTracks, 1);
+        cert->set_cur(0, f-fStart, 0);
+        cert->get(certOut, totalTracks, 1);
  //       xy->get(&dataOut[0][0], totalTracks, 1, 2);
 
 
   //      for (int t=0;t<totalTracks;t++)
   //          if ((dataOut[t*2]>0)&&(fidOut[t]>=0))
   //              cout<<fidOut[t]<<endl;
-        cout<<"~~~~~~~~~"<<f<<"~~~~~~~~~~"<<endl;
+ //               int col = (t%nFish);
+        putText(frame, "uncertainty", Point2f((int)1600, (int)75), FONT_HERSHEY_PLAIN, 1.5,  0, 2);
         for (int t=0;t<totalTracks;t++)
             if ((dataOut[t*2]>0)&&(fidOut[t]>=0))
             {
                 ostringstream ss;
-                ss << t;
+                ss << "fish " <<fidOut[t]<< ": ";
+                ss << scientific << setprecision(3) << certOut[t];
+ //               cout<<certOut[t]<<endl;
                 int col=fidOut[t];
- //               int col = (t%nFish);
- //               putText(frame, ss.str(), Point2f((int)dataOut[t*2]+offset, (int)dataOut[t*2 + 1]+offset), FONT_HERSHEY_PLAIN, 2,  Scalar(0,0,255,255));
+                putText(frame, ss.str(), Point2f((int)1600, (int)100+offset*col), FONT_HERSHEY_PLAIN, 1.5,  colors[col], 2);
                 cvDrawDottedRect(&frame, (int)dataOut[t*2], (int)dataOut[t*2 + 1], colors[col]);
    //             cout<<t<<endl;
-                cout<<fidOut[t]<<endl;
+                cout<<t<<" "<<certOut[t]<<" "<<fidOut[t]<<endl;
             }
+        cout<<"~~~ "<<f<<" ~~~~~"<<endl;
 
         outputVideo << frame;
         pyrDown(frame, frame) ;
@@ -218,21 +225,21 @@ void cvDrawDottedRect(cv::Mat* img, int x, int y, CvScalar color)
     Point p3(x+hwidth,y+hwidth);
     Point p4(x-hwidth,y+hwidth);
     // draw box
-    cvDrawDottedLine(img, p1, p2, color, 2, 3, 10);
-    cvDrawDottedLine(img, p2, p3, color, 2, 3, 10);
-    cvDrawDottedLine(img, p3, p4, color, 2, 3, 10);
-    cvDrawDottedLine(img, p4, p1, color, 2, 3, 10);
+    cvDrawDottedLine(img, p1, p2, color, 1, 2, 4);
+    cvDrawDottedLine(img, p2, p3, color, 1, 2, 4);
+    cvDrawDottedLine(img, p3, p4, color, 1, 2, 4);
+    cvDrawDottedLine(img, p4, p1, color, 1, 2, 4);
     // draw corners
     Point x_off(corner, 0);
     Point y_off(0, corner);
-    cvDrawDottedLine(img, p1, p1 + x_off, color, 3, 10, 10);
-    cvDrawDottedLine(img, p1, p1 + y_off, color, 3, 10, 10);
-    cvDrawDottedLine(img, p2, p2 - x_off, color, 3, 10, 10);
-    cvDrawDottedLine(img, p2, p2 + y_off, color, 3, 10, 10);
-    cvDrawDottedLine(img, p3, p3 - x_off, color, 3, 10, 10);
-    cvDrawDottedLine(img, p3, p3 - y_off, color, 3, 10, 10);
-    cvDrawDottedLine(img, p4, p4 + x_off, color, 3, 10, 10);
-    cvDrawDottedLine(img, p4, p4 - y_off, color, 3, 10, 10);
+    cvDrawDottedLine(img, p1, p1 + x_off, color, 2, 10, 10);
+    cvDrawDottedLine(img, p1, p1 + y_off, color, 2, 10, 10);
+    cvDrawDottedLine(img, p2, p2 - x_off, color, 2, 10, 10);
+    cvDrawDottedLine(img, p2, p2 + y_off, color, 2, 10, 10);
+    cvDrawDottedLine(img, p3, p3 - x_off, color, 2, 10, 10);
+    cvDrawDottedLine(img, p3, p3 - y_off, color, 2, 10, 10);
+    cvDrawDottedLine(img, p4, p4 + x_off, color, 2, 10, 10);
+    cvDrawDottedLine(img, p4, p4 - y_off, color, 2, 10, 10);
     // draw cross
     Point x_coff(cross, 0);
     Point y_coff(0, cross);
@@ -240,10 +247,10 @@ void cvDrawDottedRect(cv::Mat* img, int x, int y, CvScalar color)
     p2 = Point(x,y+hwidth);
     p3 = Point(x-hwidth,y);
     p4 = Point(x+hwidth,y);
-    cvDrawDottedLine(img, p1 + y_coff, p1, color, 2, 10, 10);
-    cvDrawDottedLine(img, p2, p2 - y_coff, color, 2, 10, 10);
-    cvDrawDottedLine(img, p3 + x_coff, p3, color, 2, 10, 10);
-    cvDrawDottedLine(img, p4 - x_coff, p4, color, 2, 10, 10);
+    cvDrawDottedLine(img, p1 + y_coff, p1, color, 1, 10, 10);
+    cvDrawDottedLine(img, p2, p2 - y_coff, color, 1, 10, 10);
+    cvDrawDottedLine(img, p3 + x_coff, p3, color, 1, 10, 10);
+    cvDrawDottedLine(img, p4 - x_coff, p4, color, 1, 10, 10);
 
 
  /*   LineIterator it(img, p1, p2, 8);            // get a line iterator

@@ -4,7 +4,10 @@ import numpy as np
 from munkres import Munkres
 import Scientific.IO.NetCDF as Dataset
 
-def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTracks):
+def assignIDs(dataDir, trialName, NUMFISH):
+    allScores = np.load("aS-" + trialName + ".npy")
+    allLiveTracks = np.load("aLT-" + trialName + ".npy")
+    mainTrackList = np.load("mTL-" + trialName + ".npy")
     # open netcdf file
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
     f = Dataset.NetCDFFile(ncFileName, 'a')
@@ -19,8 +22,12 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
     # get the movie frame numbers
     fid = f.variables['fid']
     fishIDs = []
-    fishIDs = np.empty_like(fid)
-    np.copyto(fishIDs, fid)
+    fishIDs = -np.ones_like(fid)
+
+    for tr in range(NUMFISH):
+        fishIDs[allLiveTracks[0,tr],:] = tr    
+    
+    #np.copyto(fishIDs, fid)
     cid = f.variables['certID']
     certIDs = []
     certIDs = np.empty_like(cid)
@@ -50,7 +57,7 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
     print pm
     
     # introduce a small error to account for the higher accuracy of training and testing on same set
-    eps = 0.50
+    eps = 0.10
     accMat = pm*(1.0-eps) + eps*0.25*np.ones_like(pm)
 
     # autocorrelation parameter to discount the number of samples that are effectively pseudo-reps
@@ -108,31 +115,54 @@ def assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTrac
 
 
 
-    certainty = 1.0
+    uncertainty = 0.0
     
     
     # now we loop through and take the minimum cost assignment off the stack
     while np.isfinite(theStack).any():
         calculateAllCosts(allAssign, allCosts, allLiveTracks, theStack, perms, fishIDs, trackList, trackIndex, timeIndex, NUMFISH)
         block = np.nanargmin(theStack)
-        if theStack[block]<certainty:
-            certainty = theStack[block]
+        if theStack[block]>uncertainty:
+            uncertainty = theStack[block]
 
+        if block ==32:
+            print block
+        debugCost = allCosts[17]
         # if it doesn't assign to fish and set the cost to nan to indicate it's done
         for i in range(NUMFISH):
             thisTrack = int(allLiveTracks[block,i])
+            if fishIDs[thisTrack,0]<0:
+                certIDs[thisTrack,:] = float(uncertainty)
             fishIDs[thisTrack,:] = int(allAssign[block,i,1])
-            certIDs[thisTrack,:] = float(certainty)
+            # update all costs where this track is present            
+            [b_inds, f_inds] = np.where(allLiveTracks==thisTrack)
+            
+            for j in range(np.size(b_inds)):
+                oblk = b_inds[j]
+                oind = f_inds[j]
+                allCosts[oblk,oind,:] = np.inf
+                allCosts[oblk,oind,int(allAssign[block,i,1])]=0
+        print block
+        print allCosts[17]
+            
+            
+            
+
+            
         print 'assigned fragment ' + str(block)
-        print allScores[block]
-        print allAssign[block]
-        print theStack[block]
-        print '================'
+        #print allScores[block]
+        #print allAssign[block]
+        #print theStack[block]
+      #  print uncertainty
+     #   print mainTrackList[block,2], mainTrackList[block,3]
+     #   print allLiveTracks[block]
+      #  print '================'
         theStack[block]=np.nan
        
 
+
     fid.assignValue( (fishIDs))
-    cid.assignValue( ( certIDS))
+    cid.assignValue( ( certIDs))
     f.sync()
     f.close()
     return
@@ -144,21 +174,28 @@ def calculateAllCosts(allAssign, allCosts, allLiveTracks, theStack, perms, fishI
     # first update the cost matrices based on the previous assignments
     for block in range(1,numBlocks):
         if np.isnan(theStack[block]): continue
-        for i in range(NUMFISH):
-            t_id = allLiveTracks[block, i]
-            fish = allAssign[block,i,1]
-            # we want to identify track t_id as fish
-            # first find overlapping tracks
-            otherTracks = np.unique(trackIndex[np.in1d(timeIndex,np.where(trackList[t_id, :, 0]>0)[0])])
-            for ot in otherTracks:
-                if ot!=t_id:
-                    if fishIDs[ot,0]==fish:
-                        wrong = allAssign[block,i,:]
-                        allCosts[block,wrong[0],wrong[1]] = np.inf
-        
-        np.copyto(thisCost, allCosts[block,:,:])
-        # this is the assignment
-        [indexes, stackCost] = findOptimalAssignment(thisCost, perms, NUMFISH)
+        assignBAD = True
+        while assignBAD:
+            
+            assignBAD = False
+            np.copyto(thisCost, allCosts[block,:,:])
+            # this is the assignment
+            [indexes, stackCost] = findOptimalAssignment(thisCost, perms, NUMFISH)
+            if np.isinf(stackCost): break
+            for i in range(NUMFISH):
+                t_id = allLiveTracks[block, i]
+                fish = indexes[i,1]
+                # we want to identify track t_id as fish
+                # first find overlapping tracks
+                otherTracks = np.unique(trackIndex[np.in1d(timeIndex,np.where(trackList[t_id, :, 0]>0)[0])])
+                for ot in otherTracks:
+                    if ot!=t_id:
+                        if fishIDs[ot,0]==fish:
+                            wrong =indexes[i,:]
+                            allCosts[block,wrong[0],wrong[1]] = np.inf
+                            assignBAD = True
+            
+       
         
         allAssign[block,:,:]=indexes
         theStack[block] = stackCost
@@ -183,7 +220,10 @@ def findOptimalAssignment(thisCost, perms, NUMFISH):
     if possCosts[1,ind[1]]==0:
         return np.column_stack((range(NUMFISH),perms[ind[0]])), np.inf
     else:
-        return np.column_stack((range(NUMFISH),perms[ind[0]])), possCosts[1,ind[0]]/possCosts[1,ind[1]]
+        if np.isinf(possCosts[1,ind[0]]):
+            return np.column_stack((range(NUMFISH),perms[ind[0]])), possCosts[1,ind[0]]
+        else:
+            return np.column_stack((range(NUMFISH),perms[ind[0]])), possCosts[1,ind[0]]/possCosts[1,ind[1]]
     
     
 def permute(a, results):

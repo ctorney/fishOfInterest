@@ -22,16 +22,16 @@ def main():
     
     mainTrackList = []
     print "creating sample images ..."
-    mainTrackList = createSampleImages(dataDir, trialName )
+    #mainTrackList = createSampleImages(dataDir, trialName )
     
     print "training the classifier ..."
-    trainClassifier(trialName, NUMFISH)
+#    trainClassifier(trialName, NUMFISH)
 
     print "creating the probability matrix for each track  ..."
-    [allScores, allLiveTracks] = createPMatrix(dataDir, trialName, NUMFISH, mainTrackList)
+    #createPMatrix(dataDir, trialName, NUMFISH, mainTrackList)
 
     print "assign fish IDs to each track  ..."
-    assignIDs(dataDir, trialName, NUMFISH, mainTrackList, allScores, allLiveTracks)
+    assignIDs(dataDir, trialName, NUMFISH)
 
     return
     
