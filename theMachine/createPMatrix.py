@@ -111,9 +111,9 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
     f.sync()
     f.close()
 
-    np.save("aS-" + trialName + ".npy", allScores)
-    np.save("aLT-" + trialName + ".npy", allLiveTracks)
-    np.save("mTL-" + trialName + ".npy", mainTrackList)
+    np.save(trialName + "/aS-" + trialName + ".npy", allScores)
+    np.save(trialName + "/aLT-" + trialName + ".npy", allLiveTracks)
+    np.save(trialName + "/mTL-" + trialName + ".npy", mainTrackList)
     return
 
 

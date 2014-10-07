@@ -5,9 +5,9 @@ from munkres import Munkres
 import Scientific.IO.NetCDF as Dataset
 
 def assignIDs(dataDir, trialName, NUMFISH):
-    allScores = np.load("aS-" + trialName + ".npy")
-    allLiveTracks = np.load("aLT-" + trialName + ".npy")
-    mainTrackList = np.load("mTL-" + trialName + ".npy")
+    allScores = np.load(trialName + "/aS-" + trialName + ".npy")
+    allLiveTracks = np.load(trialName + "/aLT-" + trialName + ".npy")
+    mainTrackList = np.load(trialName + "/mTL-" + trialName + ".npy")
     # open netcdf file
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
     f = Dataset.NetCDFFile(ncFileName, 'a')
@@ -99,8 +99,7 @@ def assignIDs(dataDir, trialName, NUMFISH):
     theStack = np.zeros((numBlocks))
     theStack[0]=np.nan
     
-    # hhhheeeerrrrreeeeee!!!!!!!!!!!
-    
+        
     thisCost = np.zeros_like(allCosts[0,:,:])
     for block in range(1,numBlocks):
         np.copyto(thisCost, allCosts[block,:,:])
@@ -125,9 +124,6 @@ def assignIDs(dataDir, trialName, NUMFISH):
         if theStack[block]>uncertainty:
             uncertainty = theStack[block]
 
-        if block ==32:
-            print block
-        debugCost = allCosts[17]
         # if it doesn't assign to fish and set the cost to nan to indicate it's done
         for i in range(NUMFISH):
             thisTrack = int(allLiveTracks[block,i])
@@ -142,21 +138,15 @@ def assignIDs(dataDir, trialName, NUMFISH):
                 oind = f_inds[j]
                 allCosts[oblk,oind,:] = np.inf
                 allCosts[oblk,oind,int(allAssign[block,i,1])]=0
-        print block
-        print allCosts[17]
-            
             
             
 
             
         print 'assigned fragment ' + str(block)
-        #print allScores[block]
-        #print allAssign[block]
-        #print theStack[block]
-      #  print uncertainty
-     #   print mainTrackList[block,2], mainTrackList[block,3]
-     #   print allLiveTracks[block]
-      #  print '================'
+        print allScores[block]
+        print allAssign[block]
+        print uncertainty
+        print '================'
         theStack[block]=np.nan
        
 

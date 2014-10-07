@@ -11,10 +11,10 @@ def trainClassifier(trialName, NUMFISH):
     trainPaths = []
     classes = []
     for tr in range(NUMFISH):
-        directory = './' + trialName + str(tr) + '/'
+        directory = trialName + '/FR_ID' + str(tr) + '/' 
         trainPaths.append(directory)
         classes.append(str(tr))
             
     # train the classifier on the data
     svm.train(trainPaths,classes,verbose=False)
-    svm.save('svm' + trialName + '.xml')
+    svm.save(trialName + '/svm' + trialName + '.xml')

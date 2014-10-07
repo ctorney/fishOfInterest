@@ -14,21 +14,23 @@ def main():
 
     NUMFISH = 4
 
+    if not os.path.exists(trialName):
+            os.makedirs(trialName)
     for tr in range(NUMFISH):
-        direct = trialName + str(tr)
+        direct = trialName + '/FR_ID' + str(tr)
         if not os.path.exists(direct):
             os.makedirs(direct)
 
     
     mainTrackList = []
     print "creating sample images ..."
-    #mainTrackList = createSampleImages(dataDir, trialName )
+    mainTrackList = createSampleImages(dataDir, trialName )
     
     print "training the classifier ..."
-#    trainClassifier(trialName, NUMFISH)
+    trainClassifier(trialName, NUMFISH)
 
     print "creating the probability matrix for each track  ..."
-    #createPMatrix(dataDir, trialName, NUMFISH, mainTrackList)
+    createPMatrix(dataDir, trialName, NUMFISH, mainTrackList)
 
     print "assign fish IDs to each track  ..."
     assignIDs(dataDir, trialName, NUMFISH)

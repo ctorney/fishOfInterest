@@ -87,7 +87,7 @@ def createSampleImages(dataDir, trialName):
             xp = trackList[liveTracks[tr], fr,0]
             yp = trackList[liveTracks[tr], fr,1]
             if xp>0:
-                direct = trialName + str(tr) 
+                direct = trialName + '/FR_ID' + str(tr)
                 tmpImg = thisIm.crop(round(xp), round(yp), box_dim, box_dim, centered=True)
                 save_path = direct + "/img-" + str(fr) + ".png"
                 tmpImg.save(save_path)
