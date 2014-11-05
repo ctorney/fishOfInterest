@@ -1,6 +1,7 @@
 
 #include <cv.h>
 #include <highgui.h>
+#include <opencv2/video/background_segm.hpp>
 #include <iostream>
 #include <netcdfcpp.h>
 
@@ -32,39 +33,29 @@ int main( int argc, char** argv )
 
     vector<KeyPoint> keypoints;
     string dataDir = "/home/ctorney/data/fishPredation/";
-    string bkup = dataDir + "bk-up.png";
-    string bkdown = dataDir + "bk-down.png";
-
-    // **************************************************************************************************
-    // setup background images
-    // **************************************************************************************************
-    Mat imBkUp = imread( bkup , IMREAD_GRAYSCALE);
-    Mat imBkDown = imread( bkdown, IMREAD_GRAYSCALE);
-
-    int rows = imBkUp.rows;
-    int cols = imBkUp.cols;
-    int split = 0.5*rows;
-
-    Mat imBk;
-
-    vconcat(imBkUp(Range(0,split), Range(0, cols)), imBkDown(Range(split,rows),Range(0,cols)), imBk);
-    
-    //imwrite( "bk.png", imBk );
 
 
-    string mask = dataDir + "mask.png";
+    std::string trialName;
+    if (argc > 1) 
+        trialName =  argv[1];
+    else
+    {
+        cout<<"trial name missing!"<<endl;
+        return 0;
+    }
+            
+    trialName =  "MVI_" + trialName;
 
     // **************************************************************************************************
     // create mask image
     // **************************************************************************************************
+    string mask = dataDir + "mask.png";
     Mat imMask = imread( mask, IMREAD_GRAYSCALE );
 
     // **************************************************************************************************
     // open the movie
     // **************************************************************************************************
-    string trialName = "MVI_3371";
-
-    string movie = dataDir + "sampleVideo/" + trialName + ".avi";
+    string movie = dataDir + "allVideos/" + trialName + ".MOV";
     VideoCapture cap(movie);
     if (!cap.isOpened())
     {
@@ -73,9 +64,34 @@ int main( int argc, char** argv )
     }
 
     int fCount = cap.get(CV_CAP_PROP_FRAME_COUNT );
-    int fStart = 200;
+    int fStart = 750;
     int nFrames = fCount - fStart;
     int nFish = 4;
+
+    // **************************************************************************************************
+    // create & save background image
+    // **************************************************************************************************
+    string strImBk = dataDir + "backGrounds/bk-" + trialName + ".png";
+    Mat imBk;
+
+    
+    Ptr<BackgroundSubtractor> pMOG2; //MOG2 Background subtractor
+    pMOG2 = new BackgroundSubtractorMOG2(fCount, 16, true);
+
+    Mat frame, fgMaskMOG2;
+    for(int f=0;f<fCount;f++)
+    {
+        if (!cap.grab())             
+            break;
+        if ((f<fStart)||(f%25!=0))
+            continue;
+        cap.retrieve(frame);             
+        pMOG2->operator()(frame, fgMaskMOG2, 0.025);
+
+    }
+    pMOG2->getBackgroundImage(imBk);
+    imwrite( strImBk, imBk );
+    cvtColor( imBk, imBk, CV_BGR2GRAY );
 
     // **************************************************************************************************
     // create the netcdf file
@@ -100,7 +116,7 @@ int main( int argc, char** argv )
     // **************************************************************************************************
 
     bool visuals = false;
-    Mat frame, gsFrame;
+    Mat gsFrame;
     for(int f=0;f<fCount;f++)
     {
         if (!cap.read(frame))             
@@ -111,7 +127,7 @@ int main( int argc, char** argv )
         // convert to grayscale
         cvtColor( frame, gsFrame, CV_BGR2GRAY );
         // subtract background
-        absdiff(imBk,gsFrame, gsFrame);
+        absdiff(imBk, gsFrame, gsFrame);
         // select region of interest using mask
         bitwise_and(gsFrame, imMask, gsFrame);
         // find the blobs
