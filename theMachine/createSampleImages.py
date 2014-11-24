@@ -9,9 +9,10 @@ import os
 def createSampleImages(dataDir, trialName):
    
     # movie and images
-    movieName = dataDir + "sampleVideo/" + trialName + ".avi";
-    bkGrnd = Image(dataDir + "bk.png")
-    mask  = Image(dataDir + "maskmono.png")
+    movieName = dataDir + "allVideos/" + trialName + ".MOV";
+    bkGrnd = Image(dataDir + "backGrounds/bk-" + trialName + ".png")
+    mask  = Image(dataDir + "mask.png")
+    mask = mask.createBinaryMask(color1=(1,1,1),color2=(255,255,255))
 
     # open netcdf file
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
@@ -70,9 +71,24 @@ def createSampleImages(dataDir, trialName):
     indexStart = mainTrackList[0,2]
 
     liveTracks = trackIndex[timeIndex[:]==indexStart]
+    
+    # as there's a restriction on the difference in the number of samples we won't use all images for all tracks
+    # libSVM throws an error if one track has more than twice the number of another
+    startIndex = indexStart #np.min(timeIndex[np.in1d(trackIndex,liveTracks)])
+    
+    maxStop = startIndex
+    minStop = np.max(timeIndex[np.in1d(trackIndex,liveTracks)])
+    for tr in range(thisTrackCount):
+        thisStop = np.max(timeIndex[np.in1d(trackIndex,liveTracks[tr])])
+        if thisStop>maxStop:
+            maxStop = thisStop
+        elif thisStop<minStop:
+            minStop = thisStop
+    
+    stopIndex = int(min(startIndex + 2*(minStop -startIndex),maxStop))
 
-    startIndex = np.min(timeIndex[np.in1d(trackIndex,liveTracks)])
-    stopIndex = np.max(timeIndex[np.in1d(trackIndex,liveTracks)])
+
+    
 
 
     # now go through and store images from each track in a separate folder 
@@ -87,7 +103,7 @@ def createSampleImages(dataDir, trialName):
             xp = trackList[liveTracks[tr], fr,0]
             yp = trackList[liveTracks[tr], fr,1]
             if xp>0:
-                direct = trialName + '/FR_ID' + str(tr)
+                direct = dataDir + '/process/' + trialName + '/FR_ID' + str(tr)
                 tmpImg = thisIm.crop(round(xp), round(yp), box_dim, box_dim, centered=True)
                 save_path = direct + "/img-" + str(fr) + ".png"
                 tmpImg.save(save_path)

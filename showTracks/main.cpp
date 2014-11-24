@@ -19,7 +19,7 @@ int main( int argc, char** argv )
     // **************************************************************************************************
     string trialName = "MVI_3371";
 
-    string movie = dataDir + "sampleVideo/" + trialName + ".avi";
+    string movie = dataDir + "allVideos/" + trialName + ".MOV";
     VideoCapture cap(movie);
     if (!cap.isOpened())
     {
@@ -28,7 +28,7 @@ int main( int argc, char** argv )
     }
 
     int fCount = cap.get(CV_CAP_PROP_FRAME_COUNT );
-    int fStart = 200;
+    int fStart = 750;
     int nFrames = fCount - fStart;
     int nFish = 4;
     Size S = Size((int) cap.get(CV_CAP_PROP_FRAME_WIDTH),    // Acquire input size

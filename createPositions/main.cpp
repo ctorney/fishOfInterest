@@ -117,6 +117,7 @@ int main( int argc, char** argv )
 
     bool visuals = false;
     Mat gsFrame;
+    cap.set(CV_CAP_PROP_POS_FRAMES,0);
     for(int f=0;f<fCount;f++)
     {
         if (!cap.read(frame))             

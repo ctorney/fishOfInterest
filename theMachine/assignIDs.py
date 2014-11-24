@@ -1,13 +1,13 @@
 
 import math
 import numpy as np
-from munkres import Munkres
+
 import Scientific.IO.NetCDF as Dataset
 
 def assignIDs(dataDir, trialName, NUMFISH):
-    allScores = np.load(trialName + "/aS-" + trialName + ".npy")
-    allLiveTracks = np.load(trialName + "/aLT-" + trialName + ".npy")
-    mainTrackList = np.load(trialName + "/mTL-" + trialName + ".npy")
+    allScores = np.load(dataDir + '/process/' + trialName + "/aS-" + trialName + ".npy")
+    allLiveTracks = np.load(dataDir + '/process/' + trialName + "/aLT-" + trialName + ".npy")
+    mainTrackList = np.load(dataDir + '/process/' + trialName + "/mTL-" + trialName + ".npy")
     # open netcdf file
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
     f = Dataset.NetCDFFile(ncFileName, 'a')
@@ -38,8 +38,7 @@ def assignIDs(dataDir, trialName, NUMFISH):
 
     # these variables store the index values when a track is present
     [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
-    munk = Munkres()
-
+    
     # convert the scores to an accuracy matrix for the classifier
     # this accounts for the full array of probabilities so down weights
     # assignments based on classification between individuals that are
@@ -60,9 +59,7 @@ def assignIDs(dataDir, trialName, NUMFISH):
     eps = 0.10
     accMat = pm*(1.0-eps) + eps*0.25*np.ones_like(pm)
 
-    # autocorrelation parameter to discount the number of samples that are effectively pseudo-reps
-    # i.e. 10 images that are assigned to a track should only count as 1 due to the high frame rate
-    rho = 0.025
+    
 
     allCosts = np.zeros_like(allScores)
     numBlocks = np.size(allScores,0)
@@ -104,13 +101,15 @@ def assignIDs(dataDir, trialName, NUMFISH):
     for block in range(1,numBlocks):
         np.copyto(thisCost, allCosts[block,:,:])
         # this is the assignment
-        indexes = munk.compute(thisCost)
+        
+        
+        [indexes, stackCost] = findOptimalAssignment(thisCost, perms, NUMFISH)
         np.copyto(thisCost, allCosts[block,:,:])
         allAssign[block,:,:]=indexes
         # next we calculate the cost of the assignment
-        theStack[block] = 0.0
-        for i in indexes:
-            theStack[block] += thisCost[i]
+        theStack[block] = stackCost
+        #for i in indexes:
+        #    theStack[block] += thisCost[i]
 
 
 

@@ -8,9 +8,10 @@ from circularHOGExtractor import circularHOGExtractor
 
 def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
     # movie and images
-    movieName = dataDir + "sampleVideo/" + trialName + ".avi";
-    bkGrnd = Image(dataDir + "bk.png")
-    mask  = Image(dataDir + "maskmono.png")
+    movieName = dataDir + "allVideos/" + trialName + ".MOV";
+    bkGrnd = Image(dataDir + "backGrounds/bk-" + trialName + ".png")
+    mask  = Image(dataDir + "mask.png")
+    mask = mask.createBinaryMask(color1=(1,1,1),color2=(255,255,255))
 
     # open netcdf file
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
@@ -61,7 +62,8 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
         mainTrackList = mainTrackList[ind,:].astype(int)
 
     # load the classifier
-    cl = SVMClassifier.load('svm' + trialName + '.xml')
+
+    cl = SVMClassifier.load(dataDir + '/process/' + trialName + '/svm' + trialName + '.xml')
     classes = []
     for tr in range(NUMFISH):
         classes.append(str(tr))
@@ -97,9 +99,10 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
                 if xp>0:        
                     # extract the individual and classify
                     tmpImg = thisIm.crop(round(xp), round(yp), box_dim,box_dim, centered=True)
-                    fishGuess = cl.classify(tmpImg)
-                    # record the score for this track
-                    score[tr,int(fishGuess)]+=1
+                    if tmpImg.width==box_dim and tmpImg.height==box_dim:
+                        fishGuess = cl.classify(tmpImg)
+                        # record the score for this track
+                        score[tr,int(fishGuess)]+=1
 
            
         # store the total score matrix for assigning each track to each possible identity 
@@ -110,10 +113,9 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
 
     f.sync()
     f.close()
-
-    np.save(trialName + "/aS-" + trialName + ".npy", allScores)
-    np.save(trialName + "/aLT-" + trialName + ".npy", allLiveTracks)
-    np.save(trialName + "/mTL-" + trialName + ".npy", mainTrackList)
+    np.save(dataDir + '/process/' + trialName + "/aS-" + trialName + ".npy", allScores)
+    np.save(dataDir + '/process/' + trialName + "/aLT-" + trialName + ".npy", allLiveTracks)
+    np.save(dataDir + '/process/' + trialName + "/mTL-" + trialName + ".npy", mainTrackList)
     return
 
 

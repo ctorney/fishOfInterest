@@ -7,17 +7,19 @@ from createSampleImages import createSampleImages
 from trainClassifier import trainClassifier
 from createPMatrix import createPMatrix
 from assignIDs import assignIDs
+import sys
 
+#def main(trialName):
 def main():
     dataDir = '/home/ctorney/data/fishPredation/'
-    trialName = "MVI_3371"
-
+    #trialName = "MVI_" +  str(sys.argv[1])
+    trialName = "MVI_3402"
     NUMFISH = 4
 
     if not os.path.exists(trialName):
             os.makedirs(trialName)
     for tr in range(NUMFISH):
-        direct = trialName + '/FR_ID' + str(tr)
+        direct = dataDir + '/process/' + trialName + '/FR_ID' + str(tr)
         if not os.path.exists(direct):
             os.makedirs(direct)
 

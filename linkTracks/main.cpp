@@ -43,7 +43,15 @@ int main( int argc, char** argv )
     // **************************************************************************************************
     // open the positions netcdf file
     // **************************************************************************************************
-    string trialName = "MVI_3371";
+    std::string trialName;
+    if (argc > 1) 
+        trialName =  argv[1];
+    else
+    {
+        cout<<"trial name missing!"<<endl;
+        return 0;
+    }
+    trialName =  "MVI_" + trialName;
 
     string ncFileName = dataDir + "tracked/linked" + trialName + ".nc";
     NcFile outputFile(ncFileName.c_str(), NcFile::Replace);
