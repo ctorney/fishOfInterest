@@ -2,7 +2,7 @@
 from SimpleCV import SVMClassifier
 from circularHOGExtractor import circularHOGExtractor
 
-def trainClassifier(trialName, NUMFISH):
+def trainClassifier(dataDir, trialName, NUMFISH):
 
 
     
@@ -12,11 +12,11 @@ def trainClassifier(trialName, NUMFISH):
     svm = SVMClassifier(extractor) # try an svm, default is an RBF kernel function
     trainPaths = []
     classes = []
-    for tr in range(1,NUMFISH-1):
-        directory = trialName + '/FR_ID' + str(tr) + '/' 
+    for tr in range(NUMFISH):
+        directory = dataDir + '/process/' + trialName + '/FR_ID' + str(tr) + '/' 
         trainPaths.append(directory)
         classes.append(str(tr))
             
     # train the classifier on the data
-    svm.train(trainPaths,classes,verbose=True)
+    svm.train(trainPaths,classes,verbose=False)
     svm.save(dataDir + '/process/' + trialName + '/svm' + trialName + '.xml')

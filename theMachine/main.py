@@ -9,15 +9,15 @@ from createPMatrix import createPMatrix
 from assignIDs import assignIDs
 import sys
 
-#def main(trialName):
 def main():
+
     dataDir = '/home/ctorney/data/fishPredation/'
-    #trialName = "MVI_" +  str(sys.argv[1])
-    trialName = "MVI_3402"
+    trialName = "MVI_" +  str(sys.argv[1])
+    #trialName = "MVI_3402"
     NUMFISH = 4
 
-    if not os.path.exists(trialName):
-            os.makedirs(trialName)
+    if not os.path.exists(dataDir + '/process/' + trialName):
+            os.makedirs(dataDir + '/process/' + trialName)
     for tr in range(NUMFISH):
         direct = dataDir + '/process/' + trialName + '/FR_ID' + str(tr)
         if not os.path.exists(direct):
@@ -29,7 +29,7 @@ def main():
     mainTrackList = createSampleImages(dataDir, trialName )
     
     print "training the classifier ..."
-    trainClassifier(trialName, NUMFISH)
+    trainClassifier(dataDir, trialName, NUMFISH)
 
     print "creating the probability matrix for each track  ..."
     createPMatrix(dataDir, trialName, NUMFISH, mainTrackList)
