@@ -2,9 +2,13 @@
 #include <iostream>
 #include <netcdfcpp.h>
 #include <math.h>
-#include <cv.h>
-#include <highgui.h>
 #include <opencv2/video/tracking.hpp>
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/features2d/features2d.hpp>
 
 using namespace std;
 using namespace cv;
@@ -39,6 +43,7 @@ int assignTracks(track* allTracks, float* dataXY,  int totalFish, int totalTrack
 int main( int argc, char** argv )
 {
     string dataDir = "/home/ctorney/data/fishPredation/";
+    //string dataDir = "/home/ctorney/data/fishNick/";
 
     // **************************************************************************************************
     // open the positions netcdf file
@@ -51,7 +56,7 @@ int main( int argc, char** argv )
         cout<<"trial name missing!"<<endl;
         return 0;
     }
-    trialName =  "MVI_" + trialName;
+    //trialName =  "MVI_" + trialName;
 
     string ncFileName = dataDir + "tracked/linked" + trialName + ".nc";
     NcFile outputFile(ncFileName.c_str(), NcFile::Replace);
@@ -276,7 +281,7 @@ int assignTracks(track* allTracks, float* dataXY,  int totalFish, int totalTrack
                 // initialize the Kalman filter
                 allTracks[j].KF = new KalmanFilter(6, 2, 0);
                 // assume dt=1 for simplicity
-                allTracks[j].KF->transitionMatrix = *(Mat_<float>(6, 6) << 1,0,1,0,0.5,0, 0,1,0,1,0,0.5, 0,0,1,0,1,0, 0,0,0,1,0,1, 0,0,0,0,1,0, 0,0,0,0,0,1);
+                allTracks[j].KF->transitionMatrix = (Mat_<float>(6, 6) << 1,0,1,0,0.5,0, 0,1,0,1,0,0.5, 0,0,1,0,1,0, 0,0,0,1,0,1, 0,0,0,0,1,0, 0,0,0,0,0,1);
 
                 allTracks[j].KF->statePre.at<float>(0) = allTracks[j].x;
                 allTracks[j].KF->statePre.at<float>(1) = allTracks[j].y;

@@ -1,7 +1,10 @@
 
-#include <cv.h>
-#include <highgui.h>
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/video/background_segm.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/features2d/features2d.hpp>
 #include <iostream>
 #include <netcdfcpp.h>
 
@@ -28,8 +31,8 @@ int main( int argc, char** argv )
     params.maxThreshold = 255;
 
     // set up and create the detector using the parameters
-    Ptr<FeatureDetector> blob_detector = new SimpleBlobDetector(params);
-    blob_detector->create("SimpleBlob");
+    // Set up detector with params
+    Ptr<SimpleBlobDetector> blob_detector = SimpleBlobDetector::create(params);
 
     vector<KeyPoint> keypoints;
     string dataDir = "/home/ctorney/data/fishPredation/";
@@ -44,7 +47,7 @@ int main( int argc, char** argv )
         return 0;
     }
             
-    trialName =  "MVI_" + trialName;
+ //   trialName =  "MVI_" + trialName;
 
     // **************************************************************************************************
     // create mask image
@@ -63,7 +66,7 @@ int main( int argc, char** argv )
         return -1;
     }
 
-    int fCount = cap.get(CV_CAP_PROP_FRAME_COUNT );
+    int fCount = cap.get(CAP_PROP_FRAME_COUNT );
     int fStart = 750;
     int nFrames = fCount - fStart;
     int nFish = 4;
@@ -75,8 +78,7 @@ int main( int argc, char** argv )
     Mat imBk;
 
     
-    Ptr<BackgroundSubtractor> pMOG2; //MOG2 Background subtractor
-    pMOG2 = new BackgroundSubtractorMOG2(fCount, 16, true);
+    Ptr<BackgroundSubtractor> pMOG2 = createBackgroundSubtractorMOG2(fCount, 16, true);
 
     Mat frame, fgMaskMOG2;
     for(int f=0;f<fCount;f++)
@@ -86,12 +88,12 @@ int main( int argc, char** argv )
         if ((f<fStart)||(f%25!=0))
             continue;
         cap.retrieve(frame);             
-        pMOG2->operator()(frame, fgMaskMOG2, 0.025);
+        pMOG2->apply(frame, fgMaskMOG2, 0.025);
 
     }
     pMOG2->getBackgroundImage(imBk);
     imwrite( strImBk, imBk );
-    cvtColor( imBk, imBk, CV_BGR2GRAY );
+    cvtColor( imBk, imBk, COLOR_BGR2GRAY );
 
     // **************************************************************************************************
     // create the netcdf file
@@ -115,9 +117,11 @@ int main( int argc, char** argv )
     // loop over all frames and record positions
     // **************************************************************************************************
 
-    bool visuals = false;
+    bool visuals = true;
+    if (visuals)
+        namedWindow("Positions", 1);
     Mat gsFrame;
-    cap.set(CV_CAP_PROP_POS_FRAMES,0);
+    cap.set(CAP_PROP_POS_FRAMES,0);
     for(int f=0;f<fCount;f++)
     {
         if (!cap.read(frame))             
@@ -126,7 +130,7 @@ int main( int argc, char** argv )
             continue;
 
         // convert to grayscale
-        cvtColor( frame, gsFrame, CV_BGR2GRAY );
+        cvtColor( frame, gsFrame, COLOR_BGR2GRAY );
         // subtract background
         absdiff(imBk, gsFrame, gsFrame);
         // select region of interest using mask
@@ -160,10 +164,10 @@ int main( int argc, char** argv )
         if (visuals)
         {
             pyrDown(frame, frame) ;
-            imshow("detected individuals", frame);
+            imshow("Positions", frame);
 
 
-            char key = cvWaitKey(10);
+            char key = waitKey(10);
             if (key == 27) // ESC
                 break;
         }

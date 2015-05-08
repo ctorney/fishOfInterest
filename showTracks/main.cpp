@@ -1,7 +1,14 @@
 
-#include <cv.h>
-#include <highgui.h>
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/features2d/features2d.hpp>
+
+#include "opencv2/imgproc/types_c.h"
 #include <iostream>
+#include <iomanip>
 #include <netcdfcpp.h>
 
 using namespace cv;
@@ -17,7 +24,7 @@ int main( int argc, char** argv )
     // **************************************************************************************************
     // open the movie
     // **************************************************************************************************
-    string trialName = "MVI_3371";
+    string trialName = "MVI_3460";
 
     string movie = dataDir + "allVideos/" + trialName + ".MOV";
     VideoCapture cap(movie);
@@ -27,17 +34,17 @@ int main( int argc, char** argv )
         return -1;
     }
 
-    int fCount = cap.get(CV_CAP_PROP_FRAME_COUNT );
+    int fCount = cap.get(CAP_PROP_FRAME_COUNT );
     int fStart = 750;
     int nFrames = fCount - fStart;
-    int nFish = 4;
-    Size S = Size((int) cap.get(CV_CAP_PROP_FRAME_WIDTH),    // Acquire input size
-            (int) cap.get(CV_CAP_PROP_FRAME_HEIGHT));
+    int nFish = 2;
+    Size S = Size((int) cap.get(CAP_PROP_FRAME_WIDTH),    // Acquire input size
+            (int) cap.get(CAP_PROP_FRAME_HEIGHT));
 
     string outMovie = "./" + trialName + "_TRACKED.avi";
-    int ex = static_cast<int>(cap.get(CV_CAP_PROP_FOURCC)); 
+    int ex = static_cast<int>(cap.get(CAP_PROP_FOURCC)); 
     VideoWriter outputVideo;      
-    outputVideo.open(outMovie, ex, cap.get(CV_CAP_PROP_FPS), S, true);
+    outputVideo.open(outMovie, ex, cap.get(CAP_PROP_FPS), S, true);
 
 
     Scalar colors[nFish];
@@ -121,7 +128,7 @@ int main( int argc, char** argv )
         imshow("detected individuals", frame);
 
 
-        char key = cvWaitKey(10);
+        char key = waitKey(10);
         if (key == 27) // ESC
             break;
     }
