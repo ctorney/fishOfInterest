@@ -1,10 +1,8 @@
-from SimpleCV.base import *
-from SimpleCV.ImageClass import Image
-from SimpleCV.Features.FeatureExtractorBase import *
+import numpy as np
 import cmath as cm
 
 
-class circularHOGExtractor(FeatureExtractorBase):
+class circularHOGExtractor():
     """
     Create a 1D edge length histogram and 1D edge angle histogram.
     
@@ -60,8 +58,8 @@ class circularHOGExtractor(FeatureExtractorBase):
 
 
     def extract(self, img):
-        I = img.getGrayNumpyCv2().astype(float)/255.0
- #       I = (I-I.mean())/I.std()
+        I = img.astype(float)/255.0
+#      I = (I-I.mean())/I.std()
 
         # size and centre of image
         (nx, ny) = I.shape
@@ -76,7 +74,7 @@ class circularHOGExtractor(FeatureExtractorBase):
         phi = np.angle(dz)
         r = np.abs(dz)
  #       r = r/(r.mean()+0.001)
-	
+
 
         # create an empty array for storing the dfft of the orientation vector
         histF = np.zeros([nx, ny, self.mNMaxFreq+1])+0j

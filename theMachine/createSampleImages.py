@@ -1,22 +1,24 @@
 #import SimpleCV
-from SimpleCV import Image,  VirtualCamera, Display, Color
 import numpy as np
 import Scientific.IO.NetCDF as Dataset
 #from netCDF4 import Dataset
 import cv2
 import os
 
+
 def createSampleImages(dataDir, trialName):
    
     # movie and images
     movieName = dataDir + "allVideos/" + trialName + ".MOV";
-    bkGrnd = Image(dataDir + "backGrounds/bk-" + trialName + ".png")
-    mask  = Image(dataDir + "mask.png")
-    mask = mask.createBinaryMask(color1=(1,1,1),color2=(255,255,255))
+    bkGrnd = cv2.imread(dataDir + "backGrounds/bk-" + trialName + ".png")
+    bkGrnd = cv2.cvtColor(bkGrnd, cv2.COLOR_BGR2GRAY)
+    mask = cv2.imread(dataDir + "mask.png")
+    #mask = mask.createBinaryMask(color1=(1,1,1),color2=(255,255,255))
 
     # open netcdf file
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
     f = Dataset.NetCDFFile(ncFileName, 'a')
+   
 
     # get the positions variable
     trXY = f.variables['trXY']
@@ -91,22 +93,31 @@ def createSampleImages(dataDir, trialName):
     
 
 
-    # now go through and store images from each track in a separate folder 
-    box_dim = 50    
-    vir = VirtualCamera(movieName, "video")
-    for fr in range(startIndex, stopIndex):
-        thisIm = vir.getFrame(trFrames[fr]).toGray()
-        thisIm = Image(cv2.absdiff(thisIm.getGrayNumpyCv2(), bkGrnd.getGrayNumpyCv2()), cv2image=True)
-        thisIm = thisIm.applyBinaryMask(mask)
+    # now go through and store images from each track in a separate folder
+    box_dim = 50
+    bd2 = int(box_dim*0.5)
+    cap = cv2.VideoCapture(movieName)
+    cap.set(cv2.CAP_PROP_POS_FRAMES,trFrames[startIndex])
+
+#   cv2.NamedWindow("w1", cv2.WINDOW_AUTOSIZE)
+    for fr in range(startIndex,stopIndex):
+        ret, frame = cap.read()
+        thisIm = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#       cv2.imshow('frame',thisIm)
+#        cv2.waitKey(0)
+        thisIm = cv2.absdiff(thisIm, bkGrnd)
+#        thisIm = thisIm.applyBinaryMask(mask)
         
         for tr in range(thisTrackCount):
-            xp = trackList[liveTracks[tr], fr,0]
-            yp = trackList[liveTracks[tr], fr,1]
+            xp = int(trackList[liveTracks[tr], fr,0])
+            yp = int(trackList[liveTracks[tr], fr,1])
+#          print fr, xp, yp
             if xp>0:
                 direct = dataDir + '/process/' + trialName + '/FR_ID' + str(tr)
-                tmpImg = thisIm.crop(round(xp), round(yp), box_dim, box_dim, centered=True)
-                save_path = direct + "/img-" + str(fr) + ".png"
-                tmpImg.save(save_path)
+                tmpImg = thisIm[int(round(yp))-bd2:int(round(yp))+bd2, int(round(xp))-bd2:int(round(xp))+bd2]
+                if tmpImg.shape[0]==box_dim and tmpImg.shape[1]==box_dim:
+                    save_path = direct + "/img-" + str(fr) + ".png"
+                    cv2.imwrite(save_path, tmpImg)
             
     # store the IDs     
     for tr in range(thisTrackCount):
