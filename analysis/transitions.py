@@ -1,6 +1,7 @@
 
 import numpy as np
-import Scientific.IO.NetCDF as Dataset
+
+import scipy.io.netcdf as Dataset
 import cv2
 import sys
 
@@ -18,26 +19,26 @@ def main():
         trialName = "MVI_" +  str(trial[3])
         NUMFISH = int(trial[2])
         ncFileName = dataDir + "tracked/linked" + trialName + ".nc"
-        print ncFileName
+        print(ncFileName)
         f = Dataset.NetCDFFile(ncFileName, 'r')
         
 
         # get the positions variable
         trXY = f.variables['trXY']
         trackList = []
-        trackList = np.empty_like (trXY)
-        np.copyto(trackList,trXY)
+        trackList = np.empty_like (trXY.data)
+        np.copyto(trackList,trXY.data)
         [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
         
         # get the movie frame numbers
         fid = f.variables['fid']
         fishIDs = []
-        fishIDs = np.empty_like(fid)
-        np.copyto(fishIDs, fid)
+        fishIDs = np.empty_like(fid.data)
+        np.copyto(fishIDs, fid.data)
         cid = f.variables['certID']
         certIDs = []
-        certIDs = np.empty_like(cid)
-        np.copyto(certIDs, cid)
+        certIDs = np.empty_like(cid.data)
+        np.copyto(certIDs, cid.data)
         
     
     
@@ -49,6 +50,7 @@ def main():
     
         fishArm = np.zeros((NUMFISH,np.max(timeIndex)))-1
         fishCert = np.zeros((NUMFISH,np.max(timeIndex)))
+        fishTrackNum = np.zeros((NUMFISH,np.max(timeIndex)))
     
         for t in range(np.min(timeIndex),np.max(timeIndex)):
             liveTracks = trackIndex[timeIndex[:]==t]
@@ -61,12 +63,13 @@ def main():
             
                 fishCert[fishIDs[tr,t],t] = min( certIDs[tr,0],1.0)
                 fishArm[fishIDs[tr,t],t] = arms[((yp,xp))] # int(round(float(arms[((yp,xp))])/(0.5*255.0)))
-
+                fishTrackNum[fishIDs[tr,t],t] = tr
 
         for thisFish in range(NUMFISH):
             soloTrans = 0
             followTrans = 0
             currentArms = fishArm[thisFish,0:6750].copy()
+            currentTracks = fishTrackNum[thisFish,0:6750].copy()
             neighbours = np.zeros_like(currentArms)
             nArms = len(currentArms)
             for aaa in range(1,nArms):
@@ -79,10 +82,10 @@ def main():
                         neighbours[aaa]+=1
             # points where the sum of the track IDs change are when a track is lost or found
             d= np.diff(currentArms)
-        
-            idx, = d.nonzero()
+            d2= np.diff(currentTracks)
+            idx, = ((d>0)&(d2==0)).nonzero()
             NSW = np.size(idx)
-#           print idx
+            print( idx)
     
             for id in idx:
                 myArm = currentArms[id + 1]
@@ -111,7 +114,7 @@ def main():
 #                t2 = np.hstack((trial[0:3],soloTrans/float( NSW)))
 #            else:
 ##                t2 = np.hstack((trial[0:3],0))
-            print t2
+            print(t2)
             results = np.vstack((results, t2))
         f.close()
     #print results
@@ -121,8 +124,8 @@ def main():
 if __name__ == "__main__":
     allData = main()
     #plt.boxplot([allData[np.logical_and(allData[:,1]==0 , allData[:,0]==0 ),3],allData[np.logical_and(allData[:,1]==0 , allData[:,0]==0 ),3],allData[np.logical_and(allData[:,1]==0 , allData[:,0]==0 ),3]],50,'')
-    #plt.boxplot([allData[allData[:,0]==0,3],allData[allData[:,0]==1,3],allData[allData[:,0]==2,3]],50,'')
-    #means = ([np.mean(allData[allData[:,0]==i,3]) for i in range(3)])
-    #plt.scatter([1, 2, 3], means)
-    #plt.show()
+    plt.boxplot([allData[allData[:,0]==0,3],allData[allData[:,0]==1,3],allData[allData[:,0]==2,3]],50,'')
+    means = ([np.mean(allData[allData[:,0]==i,3]) for i in range(3)])
+    plt.scatter([1, 2, 3], means)
+    plt.show()
     np.savetxt('truncData.txt',allData, delimiter=',', fmt=['%d','%d','%d','%d','%d','%f','%d','%d'])

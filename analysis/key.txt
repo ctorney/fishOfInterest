@@ -1,0 +1,7 @@
+Lower aripo	0
+Lower lopinot	1
+Lower turure	2
+Upper aripo	3
+Upper lopinot	4
+Upper turure	5
+
