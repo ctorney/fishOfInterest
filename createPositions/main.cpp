@@ -19,16 +19,17 @@ int main( int argc, char** argv )
     // set up the parameters for blob detection
     // **************************************************************************************************
     SimpleBlobDetector::Params params;
-    params.minDistBetweenBlobs = 1.0f;
+    params.minDistBetweenBlobs = 5.0f;
     params.filterByInertia = false;
     params.filterByConvexity = false;
     params.filterByColor = false;
     params.filterByCircularity = false;
     params.filterByArea = true;
-    params.minArea = 5.0f;
-    params.maxArea = 200.0f;
-    params.minThreshold = 15;
-    params.maxThreshold = 255;
+    params.minArea = 10.0f;
+    params.maxArea = 500.0f;
+    params.minThreshold = 215;
+    params.thresholdStep = 15;
+    params.maxThreshold = 250;
 
     // set up and create the detector using the parameters
     // Set up detector with params
@@ -52,7 +53,7 @@ int main( int argc, char** argv )
     // **************************************************************************************************
     // create mask image
     // **************************************************************************************************
-    string mask = dataDir + "mask.png";
+    string mask = dataDir + "masks/mask-" + trialName + ".png";
     Mat imMask = imread( mask, IMREAD_GRAYSCALE );
 
     // **************************************************************************************************
@@ -60,39 +61,48 @@ int main( int argc, char** argv )
     // **************************************************************************************************
     string movie = dataDir + "allVideos/" + trialName + ".MOV";
     VideoCapture cap(movie);
+
     if (!cap.isOpened())
     {
         cout << "Failed to open avi file: " << movie << endl;
         return -1;
     }
 
-    int fCount = cap.get(CAP_PROP_FRAME_COUNT );
+    int fCount = 7500;//cap.get(CAP_PROP_FRAME_COUNT );
     int fStart = 750;
     int nFrames = fCount - fStart;
-    int nFish = 4;
+    int nFish = 2*atoi(argv[2]) + 2;
+
+    int fishCounts[nFish+1];
+    for (int nf=0;nf<nFish+1;nf++)
+        fishCounts[nf]=0;
 
     // **************************************************************************************************
     // create & save background image
     // **************************************************************************************************
     string strImBk = dataDir + "backGrounds/bk-" + trialName + ".png";
-    Mat imBk;
+    Mat imBk = imread( strImBk);
 
     
-    Ptr<BackgroundSubtractor> pMOG2 = createBackgroundSubtractorMOG2(fCount, 16, true);
-
     Mat frame, fgMaskMOG2;
-    for(int f=0;f<fCount;f++)
+    if (imBk.empty())
     {
-        if (!cap.grab())             
-            break;
-        if ((f<fStart)||(f%25!=0))
-            continue;
-        cap.retrieve(frame);             
-        pMOG2->apply(frame, fgMaskMOG2, 0.025);
+        Ptr<BackgroundSubtractor> pMOG2 = createBackgroundSubtractorMOG2(fCount, 16, true);
 
+        for(int f=0;f<fCount;f++)
+        {
+            if (!cap.grab())             
+                break;
+            if ((f<fStart)||(f%25!=0))
+                continue;
+            cap.retrieve(frame);             
+            pMOG2->apply(frame, fgMaskMOG2, 0.025);
+
+        }
+        pMOG2->getBackgroundImage(imBk);
+
+        imwrite( strImBk, imBk );
     }
-    pMOG2->getBackgroundImage(imBk);
-    imwrite( strImBk, imBk );
     cvtColor( imBk, imBk, COLOR_BGR2GRAY );
 
     // **************************************************************************************************
@@ -117,7 +127,7 @@ int main( int argc, char** argv )
     // loop over all frames and record positions
     // **************************************************************************************************
 
-    bool visuals = true;
+    bool visuals = 1;
     if (visuals)
         namedWindow("Positions", 1);
     Mat gsFrame;
@@ -126,7 +136,7 @@ int main( int argc, char** argv )
     {
         if (!cap.read(frame))             
             break;
-        if (f<fStart)
+        if (f<fStart-1)
             continue;
 
         // convert to grayscale
@@ -135,6 +145,11 @@ int main( int argc, char** argv )
         absdiff(imBk, gsFrame, gsFrame);
         // select region of interest using mask
         bitwise_and(gsFrame, imMask, gsFrame);
+        threshold(gsFrame, gsFrame, 20, 255, THRESH_BINARY );
+        bitwise_not(gsFrame, gsFrame);
+        if (f<fStart)
+            continue;
+  //      bitwise_or(gsFrame, lastFrame, gsFrame);
         // find the blobs
         blob_detector->detect(gsFrame, keypoints);
         // create array for output
@@ -152,8 +167,9 @@ int main( int argc, char** argv )
             dataOut[i][0] = keypoints[i].pt.x; 
             dataOut[i][1] = keypoints[i].pt.y;
             if (visuals)
-                circle( frame,keypoints[i].pt, 8, Scalar( 25, 125, 125 ), -1, 8);
+                circle( gsFrame,keypoints[i].pt, 8, Scalar( 25, 125, 125 ), -1, 8);
         }
+        fishCounts[foundPoints]++;
 
         pxy->set_cur(f - fStart);
         frNum->set_cur(f - fStart);
@@ -163,8 +179,8 @@ int main( int argc, char** argv )
 
         if (visuals)
         {
-            pyrDown(frame, frame) ;
-            imshow("Positions", frame);
+            pyrDown(gsFrame, gsFrame) ;
+            imshow("Positions", gsFrame);
 
 
             char key = waitKey(10);
@@ -172,6 +188,10 @@ int main( int argc, char** argv )
                 break;
         }
     }
+    cout<<trialName<<" : ";
+    for (int nf=0;nf<nFish+1;nf++)
+        cout<<fishCounts[nf]<<" : ";
+    cout<<endl;
 
     return 0;
 }
