@@ -1,5 +1,5 @@
 import numpy as np
-import Scientific.IO.NetCDF as Dataset
+import scipy.io.netcdf as Dataset
 import cv2
 import os
 from createSampleImages import createSampleImages
@@ -11,13 +11,14 @@ import sys
 
 def main():
 
-    dataDir = '/home/ctorney/data/fishPredation/'
+    #dataDir = '/home/ctorney/data/fishPredation/'
+    dataDir = "/media/ctorney/SAMSUNG/data/fishPredation/"
 
-    trialName = "MVI_" +  str(sys.argv[1])
+    trialName = str(sys.argv[1])
     NUMFISH = int(sys.argv[2])
-    #trialName = "MVI_3370"
-    #NUMFISH = 2
-    print trialName, NUMFISH
+    #trialName = "MVI_3739"
+    #NUMFISH = 4
+    print('starting : ' + trialName)
 
     if not os.path.exists(dataDir + '/process/' + trialName):
             os.makedirs(dataDir + '/process/' + trialName)
@@ -27,18 +28,20 @@ def main():
             os.makedirs(direct)
 
     mainTrackList = []
-    print "creating sample images ..."
+    print("creating sample images ...")
     mainTrackList = createSampleImages(dataDir, trialName )
     
-    print "training the classifier ..."
+    print("training the classifier ...")
     trainClassifier(dataDir, trialName, NUMFISH)
+    sys.stdout.flush()
 
-    print "creating the probability matrix for each track  ..."
+    print("creating the probability matrix for each track  ...")
     createPMatrix(dataDir, trialName, NUMFISH, mainTrackList)
 
-    print "assign fish IDs to each track  ..."
+    print("assign fish IDs to each track  ...")
     assignIDs(dataDir, trialName, NUMFISH)
-
+    print(trialName + " completed")
+    sys.stdout.flush()
     return
     
 

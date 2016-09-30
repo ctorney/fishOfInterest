@@ -15,8 +15,8 @@ def trainClassifier(dataDir, trialName, NUMFISH):
 
 
     
-    ch = circularHOGExtractor(5,5,6) 
-    nFeats = ch.getNumFields()
+    ch = circularHOGExtractor(6,4,3) 
+    nFeats = ch.getNumFields()+1
     trainData = np.array([])#np.zeros((len(lst0)+len(lst0c)+len(lst1),nFeats))
     targetData = np.array([])#np.hstack((np.zeros(len(lst0)+len(lst0c)),np.ones(len(lst1))))
     for tr in range(NUMFISH):
@@ -29,13 +29,13 @@ def trainClassifier(dataDir, trialName, NUMFISH):
             sample = cv2.imread(directory + imName)
             thisIm = cv2.cvtColor(sample, cv2.COLOR_BGR2GRAY)
             
-            thisData[i,:] = ch.extract(thisIm)            
+            thisData[i,:] = np.hstack((ch.extract(thisIm), np.mean(thisIm)))
             i = i + 1
         trainData = np.vstack((trainData, thisData)) if trainData.size else thisData
         targetData = np.hstack((targetData, thisTarget)) if targetData.size else thisTarget
 
-    clf = svm.SVC()
-    #gnb = AdaBoostClassifier(DecisionTreeClassifier(max_depth=1),algorithm="SAMME",n_estimators=200)
+    #clf = svm.SVC()
+    clf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=1),algorithm="SAMME",n_estimators=50)
     y_pred = clf.fit(trainData,targetData)
     pickle.dump(clf, open( dataDir + '/process/' + trialName + '/boost' + trialName + '.p',"wb"))
     y_pred = clf.predict(trainData)

@@ -2,7 +2,8 @@
 import math
 import numpy as np
 
-import Scientific.IO.NetCDF as Dataset
+#import Scientific.IO.NetCDF as Dataset
+import scipy.io.netcdf as Dataset
 
 def assignIDs(dataDir, trialName, NUMFISH):
     allScores = np.load(dataDir + '/process/' + trialName + "/aS-" + trialName + ".npy")
@@ -15,22 +16,28 @@ def assignIDs(dataDir, trialName, NUMFISH):
     # get the positions variable
     trXY = f.variables['trXY']
     trackList = []
-    trackList = np.empty_like (trXY)
-    np.copyto(trackList,trXY)
+    trackList = np.empty_like (trXY.data)
+    np.copyto(trackList,trXY.data)
     [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
 
     # get the movie frame numbers
     fid = f.variables['fid']
     fishIDs = []
-    fishIDs = -np.ones_like(fid)
+    fishIDs = -np.ones_like(fid.data)
 
-    for tr in range(NUMFISH):
-        fishIDs[allLiveTracks[0,tr],:] = tr    
     
     #np.copyto(fishIDs, fid)
     cid = f.variables['certID']
     certIDs = []
-    certIDs = np.empty_like(cid)
+    certIDs = -np.ones_like(cid.data)
+
+    # we assign ID numbers to block 0
+    for tr in range(NUMFISH):
+        fishIDs[allLiveTracks[0,tr],:] = tr    
+    # as these are the initial arbitrary assignment uncertainty is zero
+    for i in range(NUMFISH):
+        thisTrack = int(allLiveTracks[0,i])
+        certIDs[thisTrack,:] = 0.0
 
     perms = []
     permute(range(NUMFISH),perms)
@@ -51,10 +58,10 @@ def assignIDs(dataDir, trialName, NUMFISH):
     pm = pm/np.sum(pm,axis=1)
 
     # print the score matrix - this determines the accuracy of the classifier
-    print trialName
-    print '==========='
-    print pm
-    
+    print(trialName)
+    print('===========')
+    print(pm)
+#    return
     # introduce a small error to account for the higher accuracy of training and testing on same set
     eps = 0.10
     accMat = pm*(1.0-eps) + eps*0.25*np.ones_like(pm)
@@ -120,10 +127,11 @@ def assignIDs(dataDir, trialName, NUMFISH):
     while np.isfinite(theStack).any():
         calculateAllCosts(allAssign, allCosts, allLiveTracks, theStack, perms, fishIDs, trackList, trackIndex, timeIndex, NUMFISH)
         block = np.nanargmin(theStack)
+        #keep track of the maximum uncertainty because anything downstream depends on this
         if theStack[block]>uncertainty:
             uncertainty = theStack[block]
 
-        # if it doesn't assign to fish and set the cost to nan to indicate it's done
+        # assign to fish and set the cost to nan to indicate it's done
         for i in range(NUMFISH):
             thisTrack = int(allLiveTracks[block,i])
             if fishIDs[thisTrack,0]<0:
@@ -141,17 +149,19 @@ def assignIDs(dataDir, trialName, NUMFISH):
             
 
             
-        print 'assigned fragment ' + str(block)
-        print allScores[block]
-        print allAssign[block]
-        print uncertainty
-        print '================'
+        print( 'assigned fragment ' + str(block))
+        print(mainTrackList[block,2],mainTrackList[block,3])
+
+        print( allScores[block])
+        print( allAssign[block])
+        print( uncertainty)
+        print( '================')
         theStack[block]=np.nan
        
 
 
-    fid.assignValue( (fishIDs))
-    cid.assignValue( ( certIDs))
+    np.copyto(fid.data,fishIDs)
+    np.copyto(cid.data,certIDs)
     f.sync()
     f.close()
     return

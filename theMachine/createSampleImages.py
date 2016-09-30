@@ -1,6 +1,7 @@
 #import SimpleCV
 import numpy as np
-import Scientific.IO.NetCDF as Dataset
+#import Scientific.IO.NetCDF as Dataset
+import scipy.io.netcdf as Dataset
 #from netCDF4 import Dataset
 import cv2
 import os
@@ -12,7 +13,6 @@ def createSampleImages(dataDir, trialName):
     movieName = dataDir + "allVideos/" + trialName + ".MOV";
     bkGrnd = cv2.imread(dataDir + "backGrounds/bk-" + trialName + ".png")
     bkGrnd = cv2.cvtColor(bkGrnd, cv2.COLOR_BGR2GRAY)
-    mask = cv2.imread(dataDir + "mask.png")
     #mask = mask.createBinaryMask(color1=(1,1,1),color2=(255,255,255))
 
     # open netcdf file
@@ -23,18 +23,18 @@ def createSampleImages(dataDir, trialName):
     # get the positions variable
     trXY = f.variables['trXY']
     trackList = []
-    trackList = np.empty_like (trXY)
-    np.copyto(trackList,trXY)
+    trackList = np.empty_like (trXY.data)
+    np.copyto(trackList,trXY.data)
 
     # get the movie frame numbers
     frNum = f.variables['frNum']
     trFrames = []
-    trFrames = np.empty_like(frNum)
-    np.copyto(trFrames,frNum)
+    trFrames = np.empty_like(frNum.data)
+    np.copyto(trFrames,frNum.data)
 
     # get the fish identities
-    fid = f.variables['fid']  
-    fishIDs = -np.ones(np.shape(fid),'int16')
+    fid = f.variables['fid']
+    fishIDs = -np.ones(np.shape(fid.data),'int16')
     
     # these variables store the index values when a track is present
     [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
@@ -57,10 +57,10 @@ def createSampleImages(dataDir, trialName):
     # because diff calculates f(n)-f(n+1) we need the next entry found for all except d[0]
     idx[idx>0]=idx[idx>0]+1
     # the difference between the indices gives the length of each block of continuous tracks
-    conCounts =  idx[1:-1] - idx[0:-1-1]
+    conCounts =  idx[1:] - idx[0:-1]
    
     # array of all tracks || length of time tracks are present || number of tracks || start index || stop index || start frame of movie || stop frame of movie
-    mainTrackList = np.column_stack((trackCount[idx[0:-1-1]], conCounts, idx[0:-1-1],idx[1:-1]))
+    mainTrackList = np.column_stack((trackCount[idx[0:-1]], conCounts, idx[0:-1],idx[1:]))
     
     # now sort the array by order of length
     ind = np.lexsort((-mainTrackList[:,1],-mainTrackList[:,0]))
@@ -123,7 +123,7 @@ def createSampleImages(dataDir, trialName):
     for tr in range(thisTrackCount):
         fishIDs[liveTracks[tr],:] = tr
         
-    fid.assignValue( (fishIDs))
+    np.copyto(fid.data,fishIDs)
     f.sync()
     f.close()
     

@@ -2,7 +2,8 @@
 
 import numpy as np
 import time
-import Scientific.IO.NetCDF as Dataset
+#import Scientific.IO.NetCDF as Dataset
+import scipy.io.netcdf as Dataset
 import cv2
 import pickle
 from sklearn.naive_bayes import GaussianNB
@@ -24,21 +25,21 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
 
     # open netcdf file
     ncFileName = dataDir + "tracked/linked" + trialName + ".nc"    
-    f = Dataset.NetCDFFile(ncFileName, 'r')
+    f = Dataset.NetCDFFile(ncFileName, 'r',mmap=False)
 
     # get the positions variable
     trXY = f.variables['trXY']
     trackList = []
-    trackList = np.empty_like (trXY)
-    np.copyto(trackList,trXY)
+    trackList = np.empty_like (trXY.data)
+    np.copyto(trackList,trXY.data)
 
     # get the movie frame numbers
     frNum = f.variables['frNum']
     trFrames = []
-    trFrames = np.empty_like(frNum)
-    np.copyto(trFrames,frNum)
+    trFrames = np.empty_like(frNum.data)
+    np.copyto(trFrames,frNum.data)
 
-    ch = circularHOGExtractor(5,5,6) 
+    ch = circularHOGExtractor(6,4,3) 
     # these variables store the index values when a track is present
     [trackIndex,timeIndex]=np.nonzero(trackList[:,:,0])
 
@@ -61,10 +62,10 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
         # because diff calculates f(n)-f(n+1) we need the next entry found for all except d[0]
         idx[idx>0]=idx[idx>0]+1
         # the difference between the indices gives the length of each block of continuous tracks
-        conCounts =  idx[1:-1] - idx[0:-1-1]
+        conCounts =  idx[1:] - idx[0:-1]
 
         # array of all tracks || length of time tracks are present || number of tracks || start index || stop index || start frame of movie || stop frame of movie
-        mainTrackList = np.column_stack((trackCount[idx[0:-1-1]], conCounts, idx[0:-1-1],idx[1:-1]))
+        mainTrackList = np.column_stack((trackCount[idx[0:-1]], conCounts, idx[0:-1],idx[1:]))
 
         # now sort the array by order of length
         ind = np.lexsort((-mainTrackList[:,1],-mainTrackList[:,0]))
@@ -84,30 +85,50 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
     allLiveTracks = np.zeros((numBlocks,NUMFISH))
 
 
-    cap = cv2.VideoCapture(movieName)
+    
 
     box_dim = 50
     bd2 = int(box_dim*0.5)
 
 
     #cv2.NamedWindow("w1", cv2.WINDOW_AUTOSIZE)
-    
+    blockList = np.zeros( shape=(0, 3) )
 
+    print(numBlocks)
     for nb in range( numBlocks):
-        # get the parameters for the current track block 
         indexStart = mainTrackList[nb,2]
         indexStop = mainTrackList[nb,3]
+        blockList= np.vstack((blockList,[indexStart,indexStop,nb]))
+    
+#    ind = np.lexsort(blockList[:,1])
+    ind = np.argsort((blockList[:,0]))
+
+    blockList = blockList[ind,:].astype(int)
+    
+
+    frameCounter = 0
+    cap = cv2.VideoCapture(movieName)
+    for block in blockList:
+        
+        # get the parameters for the current track block 
+        indexStart = block[0]#mainTrackList[nb,2]
+        indexStop = block[1]#mainTrackList[nb,3]
+        nb=block[2]
 
         score = np.zeros((NUMFISH,NUMFISH))
         liveTracks = trackIndex[timeIndex[:]==indexStart]
 
+        while (frameCounter<trFrames[indexStart]):
+            ret, frame = cap.read()
+            frameCounter+=1
         
-        cap.set(cv2.CAP_PROP_POS_FRAMES,trFrames[indexStart])
+        #cap.set(cv2.CAP_PROP_POS_FRAMES,trFrames[indexStart])
         for fr in range(indexStart, indexStop):
             # extract the frame
            
             
             ret, frame = cap.read()
+            frameCounter+=1
             thisIm = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     #       cv2.imshow('frame',thisIm)
     #        cv2.waitKey(0)
@@ -125,8 +146,10 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
                     #cv2.waitKey(1)
                     
                     if tmpImg.shape[0]==box_dim and tmpImg.shape[1]==box_dim:
-                        
-                        features = ch.extract(tmpImg)
+                        #direct = dataDir + '/process/' + trialName + '/FR_ID_TEMP'
+                        #save_path = direct + "/img-" + str(liveTracks[tr])+"-" + str(fr) + ".png"
+                        #cv2.imwrite(save_path, tmpImg)
+                        features =  np.hstack((ch.extract(tmpImg), np.mean(tmpImg)))
                         fishGuess = gnb.predict(features)
                         # record the score for this track
                         score[tr,int(fishGuess)]+=1
@@ -134,9 +157,10 @@ def createPMatrix(dataDir, trialName, NUMFISH, mainTrackList):
         # store the total score matrix for assigning each track to each possible identity 
         allScores[nb,:,:] = score
         allLiveTracks[nb,:] = liveTracks
+    cap.release()
 
 
-
+    
     f.sync()
     f.close()
     np.save(dataDir + '/process/' + trialName + "/aS-" + trialName + ".npy", allScores)
