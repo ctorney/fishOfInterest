@@ -11,20 +11,30 @@
 #include <iomanip>
 #include <netcdfcpp.h>
 
+#define SHOWPOS 0
+
 using namespace cv;
 using namespace std;
 
 int setUpNetCDF(NcFile* dataFile, int nFrames, int nFish);
-void cvDrawDottedRect(cv::Mat* img, int x, int y, CvScalar color);
+void cvDrawDottedRect(cv::Mat* img, int x, int y, cv::Scalar color);
 
 int main( int argc, char** argv )
 {
-    string dataDir = "/home/ctorney/data/fishPredation/";
+    string dataDir = "/media/ctorney/SAMSUNG/data/fishPredation/";
+    bool showTracks = 1;
 
     // **************************************************************************************************
     // open the movie
     // **************************************************************************************************
-    string trialName = "MVI_3460";
+    std::string trialName;
+    if (argc > 1) 
+        trialName =  argv[1];
+    else
+    {
+        cout<<"trial name missing!"<<endl;
+        return 0;
+    }
 
     string movie = dataDir + "allVideos/" + trialName + ".MOV";
     VideoCapture cap(movie);
@@ -34,10 +44,10 @@ int main( int argc, char** argv )
         return -1;
     }
 
-    int fCount = cap.get(CAP_PROP_FRAME_COUNT );
+    int fCount = 7500;//cap.get(CAP_PROP_FRAME_COUNT );
     int fStart = 750;
     int nFrames = fCount - fStart;
-    int nFish = 2;
+    int nFish = atoi(argv[2]);
     Size S = Size((int) cap.get(CAP_PROP_FRAME_WIDTH),    // Acquire input size
             (int) cap.get(CAP_PROP_FRAME_HEIGHT));
 
@@ -45,18 +55,24 @@ int main( int argc, char** argv )
     int ex = static_cast<int>(cap.get(CAP_PROP_FOURCC)); 
     VideoWriter outputVideo;      
     outputVideo.open(outMovie, ex, cap.get(CAP_PROP_FPS), S, true);
+    //outputVideo.open(outMovie, ex, 25, S, true);
 
 
     Scalar colors[nFish];
     colors[0] = Scalar(255,255,255);
-    colors[1] = Scalar(0,255,255);
-    colors[2] = Scalar(34,34,200);
-    colors[3] = Scalar(225,50,50);
+    colors[1] = Scalar(0,0,255);
+    colors[2] = Scalar(0,255,255);
+    colors[3] = Scalar(225,0,100);
 
     // **************************************************************************************************
     // open the netcdf file
     // **************************************************************************************************
+#if SHOWPOS
+    string ncFileName = dataDir + "tracked/" + trialName + ".nc";
+#else
     string ncFileName = dataDir + "tracked/linked" + trialName + ".nc";
+#endif
+    
     NcFile dataFile(ncFileName.c_str(), NcFile::ReadOnly);
 
     if (!dataFile.is_valid())
@@ -65,6 +81,13 @@ int main( int argc, char** argv )
         return -1;
     }
 
+#if SHOWPOS
+    NcDim* fishDim = dataFile.get_dim("fish");
+    int totalFish = fishDim->size();
+    float *dataOut = new float[totalFish*2];
+    // get the variable to store the positions
+    NcVar* xy = dataFile.get_var("pxy");
+#else
     NcDim* trDim = dataFile.get_dim("track");
     int totalTracks = trDim->size();
     float *dataOut = new float[totalTracks*2];
@@ -74,6 +97,7 @@ int main( int argc, char** argv )
     NcVar* xy = dataFile.get_var("trXY");
     NcVar* fid = dataFile.get_var("fid");
     NcVar* cert = dataFile.get_var("certID");
+#endif
 
     // **************************************************************************************************
     // loop over all frames and record positions
@@ -85,14 +109,27 @@ int main( int argc, char** argv )
     //         cout<<dataOut[t*2  ]<<" "<<dataOut[t*2 + 1]<<endl;
     //   return 0;
     
-    for(int f=0;f<fCount;f++)
+    cap.set(CAP_PROP_POS_FRAMES,fStart);
+    for(int f=fStart;f<fCount;f++)
     {
         if (!cap.read(frame))             
             break;
         if (f<fStart)
             continue;
 
+#if SHOWPOS
+ //       xy->set_cur(0, f - fStart, 0, 0);
+        xy->set_cur(f-fStart, 0, 0);
+        xy->get(dataOut, 1, totalFish, 2);
+        for (int t=0;t<totalFish;t++)
+            if (dataOut[t*2]>0)
+            {
+                int col = (t%nFish);
+                Point c1((int)dataOut[t*2], (int)dataOut[t*2 + 1]);
+                circle(frame, c1 ,2,  colors[0],-1,8);
 
+            }
+#else
  //       xy->set_cur(0, f - fStart, 0, 0);
         xy->set_cur(0, f-fStart, 0);
         xy->get(dataOut, totalTracks, 1, 2);
@@ -107,23 +144,33 @@ int main( int argc, char** argv )
   //          if ((dataOut[t*2]>0)&&(fidOut[t]>=0))
   //              cout<<fidOut[t]<<endl;
  //               int col = (t%nFish);
-        putText(frame, "uncertainty", Point2f((int)1600, (int)75), FONT_HERSHEY_PLAIN, 1.5,  0, 2);
+ //       putText(frame, "uncertainty", Point2f((int)1600, (int)75), FONT_HERSHEY_PLAIN, 1.5,  0, 2);
         for (int t=0;t<totalTracks;t++)
-            if ((dataOut[t*2]>0)&&(fidOut[t]>=0))
+            //if ((dataOut[t*2]>0)&&(fidOut[t]>=0))
+            if (dataOut[t*2]>0)
             {
+//                if (t!=256)
+  //                  continue;
                 ostringstream ss;
                 ss << "fish " <<fidOut[t]<< ": ";
                 ss << scientific << setprecision(3) << certOut[t];
+                ostringstream st;
+                st<<t;
  //               cout<<certOut[t]<<endl;
                 int col=fidOut[t];
-                putText(frame, ss.str(), Point2f((int)1600, (int)100+offset*col), FONT_HERSHEY_PLAIN, 1.5,  colors[col], 2);
+   //             int col = (t%nFish);
+   //             putText(frame, ss.str(), Point2f((int)1600, (int)100+offset*col), FONT_HERSHEY_PLAIN, 1.5,  colors[col], 2);
+                if (showTracks)
+                    putText(frame, st.str(), Point2f((int)dataOut[t*2], (int)dataOut[t*2 + 1]), FONT_HERSHEY_PLAIN, 1.5,  colors[col], 2);
                 cvDrawDottedRect(&frame, (int)dataOut[t*2], (int)dataOut[t*2 + 1], colors[col]);
    //             cout<<t<<endl;
                 cout<<t<<" "<<certOut[t]<<" "<<fidOut[t]<<endl;
             }
+#endif
         cout<<"~~~ "<<f<<" ~~~~~"<<endl;
 
-        outputVideo << frame;
+        if (f>1500)
+            outputVideo << frame;
         pyrDown(frame, frame) ;
         imshow("detected individuals", frame);
 
@@ -132,6 +179,7 @@ int main( int argc, char** argv )
         if (key == 27) // ESC
             break;
     }
+ //   outputVideo.close()
 
     return 0;
 }
@@ -169,7 +217,7 @@ int setUpNetCDF(NcFile* dataFile, int nFrames, int nFish)
 // Maxime Tremblay, 2010, Université Laval, Québec city, QB, Canada
 
 
-void cvDrawDottedLine(cv::Mat* img, Point pt1, Point pt2, CvScalar color, int thickness, int lengthDash, int lengthGap)
+void cvDrawDottedLine(cv::Mat* img, Point pt1, Point pt2, cv::Scalar color, int thickness, int lengthDash, int lengthGap)
 {
     Mat img1;
     Point pt11,pt12;
@@ -219,7 +267,7 @@ void cvDrawDottedLine(cv::Mat* img, Point pt1, Point pt2, CvScalar color, int th
     }*/
 }
 
-void cvDrawDottedRect(cv::Mat* img, int x, int y, CvScalar color)
+void cvDrawDottedRect(cv::Mat* img, int x, int y, Scalar color)
 { 
     int hwidth = 20;
     int corner = 4;
